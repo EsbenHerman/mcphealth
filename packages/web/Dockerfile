@@ -1,35 +1,35 @@
-FROM node:20-slim AS base
-ENV PNPM_HOME="/pnpm"
-ENV PATH="$PNPM_HOME:$PATH"
-RUN corepack enable && corepack prepare pnpm@9 --activate
+FROM node:22-slim AS base
+RUN corepack enable
 
-FROM base AS build
 WORKDIR /app
-COPY pnpm-lock.yaml pnpm-workspace.yaml package.json tsconfig.base.json ./
-COPY packages/shared/package.json packages/shared/
-COPY packages/web/package.json packages/web/
-RUN pnpm install --frozen-lockfile
 
+# Copy workspace config
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml tsconfig.base.json ./
+
+# Copy packages
 COPY packages/shared/ packages/shared/
 COPY packages/web/ packages/web/
 
-ARG NEXT_PUBLIC_API_URL
-ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+# Install dependencies
+RUN pnpm install --frozen-lockfile
 
+# Build shared first
 RUN pnpm --filter @mcphealth/shared build
+
+# Build Next.js
+ARG NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
 RUN pnpm --filter @mcphealth/web build
 
-FROM base AS runner
+# Production stage
+FROM node:22-slim AS runner
 WORKDIR /app
-ENV NODE_ENV=production
-RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 nextjs
 
-COPY --from=build /app/packages/web/.next/standalone ./
-COPY --from=build /app/packages/web/.next/static ./packages/web/.next/static
-COPY --from=build /app/packages/web/public ./packages/web/public
+COPY --from=base /app/packages/web/.next/standalone ./
+COPY --from=base /app/packages/web/.next/static ./packages/web/.next/static
+COPY --from=base /app/packages/web/public ./packages/web/public 2>/dev/null || true
 
-USER nextjs
 EXPOSE 3000
 ENV PORT=3000
-ENV HOSTNAME="0.0.0.0"
+ENV HOSTNAME=0.0.0.0
 CMD ["node", "packages/web/server.js"]

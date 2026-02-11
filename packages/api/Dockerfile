@@ -1,7 +1,5 @@
-FROM node:20-slim AS base
-ENV PNPM_HOME="/pnpm"
-ENV PATH="$PNPM_HOME:$PATH"
-RUN corepack enable && corepack prepare pnpm@9 --activate
+FROM node:22-slim AS base
+RUN corepack enable
 
 FROM base AS build
 WORKDIR /app
@@ -20,13 +18,11 @@ FROM base AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 
-COPY --from=build /app/pnpm-lock.yaml /app/pnpm-workspace.yaml /app/package.json ./
+COPY --from=build /app/pnpm-lock.yaml /app/pnpm-workspace.yaml /app/package.json /app/tsconfig.base.json ./
 COPY --from=build /app/packages/shared/package.json packages/shared/
 COPY --from=build /app/packages/shared/dist packages/shared/dist
 COPY --from=build /app/packages/api/package.json packages/api/
 COPY --from=build /app/packages/api/dist packages/api/dist
-COPY --from=build /app/packages/api/src/migrate.ts packages/api/src/migrate.ts
-COPY --from=build /app/packages/api/migrations packages/api/migrations
 
 RUN pnpm install --frozen-lockfile --prod
 

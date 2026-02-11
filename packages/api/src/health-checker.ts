@@ -2,7 +2,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
 import crypto from "node:crypto";
-import pool from "./db.ts";
+import pool from "./db.js";
 
 const CHECK_TIMEOUT_MS = 10_000;
 

@@ -4,9 +4,9 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import PgBoss from "pg-boss";
 import { syncRegistry } from "./registry-sync.js";
-import { checkAndRecord, checkAllRemoteServers } from "./health-checker.ts";
-import { getScoreBreakdown, scoreAllServers } from "./trust-score.ts";
-import pool from "./db.ts";
+import { checkAndRecord, checkAllRemoteServers } from "./health-checker.js";
+import { getScoreBreakdown, scoreAllServers } from "./trust-score.js";
+import pool from "./db.js";
 
 const app = new Hono();
 

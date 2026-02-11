@@ -1,4 +1,4 @@
-import pool from "./db.ts";
+import pool from "./db.js";
 // Import constants directly — workspace linking
 const SCORE_WEIGHTS = {
   availability: 0.35,
