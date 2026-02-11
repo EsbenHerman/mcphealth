@@ -8,6 +8,16 @@ import { checkAndRecord, checkAllRemoteServers } from "./health-checker.js";
 import { getScoreBreakdown, scoreAllServers } from "./trust-score.js";
 import pool from "./db.js";
 
+// Convert snake_case DB rows to camelCase for the frontend
+function camelRow(row: Record<string, any>): Record<string, any> {
+  const out: Record<string, any> = {};
+  for (const [k, v] of Object.entries(row)) {
+    const camel = k.replace(/_([a-z0-9])/g, (_, c) => c.toUpperCase());
+    out[camel] = v;
+  }
+  return out;
+}
+
 const app = new Hono();
 
 app.use("/*", cors());
@@ -134,7 +144,7 @@ app.get("/api/servers", async (c) => {
     `;
     const { rows } = await pool.query(dataQuery, [...params, limit, offset]);
 
-    return c.json({ ok: true, total, limit, offset, servers: rows });
+    return c.json({ ok: true, total, limit, offset, servers: rows.map(camelRow) });
   } catch (err: any) {
     return c.json({ ok: false, error: err.message }, 500);
   }
@@ -194,11 +204,11 @@ app.get("/api/servers/*", async (c) => {
         [srv[0].id, since, limit, offset]
       );
 
-      return c.json({ ok: true, total, limit, offset, checks });
+      return c.json({ ok: true, total, limit, offset, checks: checks.map(camelRow) });
     }
 
     // detail
-    return c.json({ ok: true, server: srv[0] });
+    return c.json({ ok: true, server: camelRow(srv[0]) });
   } catch (err: any) {
     return c.json({ ok: false, error: err.message }, 500);
   }
