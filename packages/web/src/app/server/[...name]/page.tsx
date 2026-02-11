@@ -1,4 +1,3 @@
-import type { Metadata } from "next";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { getServer, getServerScore, getServerChecks, ScoreBreakdown } from "@/lib/api";
@@ -40,27 +39,6 @@ export async function generateMetadata({ params }: { params: Promise<{ name: str
   } catch {
     return { title: serverName };
   }
-}
-
-export async function generateMetadata({ params }: { params: Promise<{ name: string[] }> }): Promise<Metadata> {
-  const { name: nameParts } = await params;
-  const serverName = nameParts.join("/");
-  let title = serverName;
-  let description = `Health status and trust score for MCP server "${serverName}".`;
-  try {
-    const server = await getServer(serverName);
-    if (server.title) title = server.title;
-    if (server.description) description = server.description;
-  } catch {}
-  return {
-    title,
-    description,
-    openGraph: {
-      title: `${title} — MCPHealth`,
-      description,
-      images: [{ url: `/server/${encodeURIComponent(serverName)}/og`, width: 1200, height: 630 }],
-    },
-  };
 }
 
 function ProgressBar({ label, value, weight }: { label: string; value: number | null; weight: string }) {
