@@ -1,185 +1,195 @@
 import Link from "next/link";
-import { getServer, getServerChecks, getServerScore } from "@/lib/api";
+import { getServer, getServerScore, getServerChecks, ScoreBreakdown } from "@/lib/api";
 import { ScoreBadge } from "@/components/ScoreBadge";
 import { StatusDot } from "@/components/StatusDot";
-import { SCORE_WEIGHTS } from "@mcphealth/shared";
 
-function ScoreBar({ label, score, weight }: { label: string; score: number | null; weight: number }) {
-  const pct = score !== null ? Math.min(100, Math.max(0, score)) : 0;
+export const dynamic = "force-dynamic";
+
+function ProgressBar({ label, value, weight }: { label: string; value: number | null; weight: string }) {
+  const v = value ?? 0;
   const color =
-    pct >= 90 ? "bg-green-400" :
-    pct >= 70 ? "bg-yellow-400" :
-    pct >= 50 ? "bg-orange-400" : "bg-red-400";
+    v >= 80 ? "bg-green-400" :
+    v >= 60 ? "bg-yellow-400" :
+    v >= 40 ? "bg-orange-400" :
+              "bg-red-400";
   return (
     <div className="space-y-1">
-      <div className="flex justify-between text-xs">
+      <div className="flex justify-between text-sm">
         <span className="text-gray-300">{label}</span>
-        <span className="text-gray-500">{score !== null ? Math.round(score) : "—"} <span className="text-gray-600">({Math.round(weight * 100)}%)</span></span>
+        <span className="text-gray-500 text-xs">{weight} · <span className="text-gray-300 font-medium">{value !== null ? Math.round(v) : "—"}</span></span>
       </div>
-      <div className="h-2 rounded-full bg-gray-800 overflow-hidden">
-        <div className={`h-full rounded-full ${color} transition-all`} style={{ width: `${pct}%` }} />
+      <div className="h-2 rounded-full bg-gray-800">
+        <div className={`h-2 rounded-full ${color} transition-all`} style={{ width: `${Math.min(v, 100)}%` }} />
       </div>
     </div>
   );
 }
 
-function CheckStatusBadge({ status }: { status: string }) {
-  const cls =
-    status === "up" ? "text-green-400 bg-green-500/10" :
-    status === "down" ? "text-red-400 bg-red-500/10" :
-    status === "timeout" ? "text-yellow-400 bg-yellow-500/10" :
-                           "text-gray-400 bg-gray-500/10";
-  return <span className={`rounded-md px-2 py-0.5 text-xs font-medium ${cls}`}>{status}</span>;
-}
-
-function MetaItem({ label, value, href }: { label: string; value: string; href?: string }) {
+function StatusTimeline({ checks }: { checks: any[] }) {
+  // Show last 24 blocks from recent checks
+  const blocks = checks.slice(0, 48).reverse();
+  if (blocks.length === 0) return <p className="text-gray-500 text-sm">No status history available.</p>;
   return (
-    <div>
-      <dt className="text-xs text-gray-500">{label}</dt>
-      <dd className="mt-0.5 text-sm text-gray-200">
-        {href ? <a href={href} target="_blank" rel="noopener noreferrer" className="text-green-400 hover:underline">{value}</a> : value}
-      </dd>
+    <div className="flex gap-0.5 flex-wrap">
+      {blocks.map((c: any, i: number) => {
+        const cls =
+          c.status === "up" ? "bg-green-400/80" :
+          c.status === "degraded" ? "bg-yellow-400/80" :
+          c.status === "down" ? "bg-red-400/80" :
+                                "bg-gray-700";
+        return (
+          <div
+            key={i}
+            className={`h-6 w-2 rounded-sm ${cls}`}
+            title={`${c.status} — ${new Date(c.checkedAt).toLocaleString()}`}
+          />
+        );
+      })}
     </div>
   );
 }
 
-export default async function ServerDetail({ params }: { params: Promise<{ name: string }> }) {
-  const { name } = await params;
-  const decodedName = decodeURIComponent(name);
+export default async function ServerDetailPage({ params }: { params: Promise<{ name: string[] }> }) {
+  const { name: nameParts } = await params;
+  const serverName = nameParts.join("/");
 
-  let server: any, score: any, checks: any;
+  let server: any = null;
+  let score: ScoreBreakdown | null = null;
+  let checks: any[] = [];
   let error = false;
+
   try {
-    [server, score, checks] = await Promise.all([
-      getServer(decodedName),
-      getServerScore(decodedName).catch(() => null),
-      getServerChecks(decodedName, { limit: "20" }).catch(() => ({ checks: [] })),
-    ]);
+    [server, score, { checks }] = await Promise.all([
+      getServer(serverName),
+      getServerScore(serverName).catch(() => null),
+      getServerChecks(serverName, { limit: "48" }).catch(() => ({ checks: [] })),
+    ]) as any;
   } catch {
     error = true;
   }
 
   if (error || !server) {
     return (
-      <div className="space-y-4">
-        <Link href="/" className="text-sm text-gray-400 hover:text-gray-200">← Back</Link>
+      <div className="space-y-6">
+        <Link href="/" className="inline-flex items-center gap-1.5 text-sm text-gray-400 hover:text-green-400 transition-colors">
+          ← Back to dashboard
+        </Link>
         <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-8 text-center text-gray-400">
-          Server not found or API unavailable.
+          <p className="text-lg font-medium">Server not found</p>
+          <p className="mt-1 text-sm">Could not load details for &quot;{serverName}&quot;</p>
         </div>
       </div>
     );
   }
 
-  // Build status timeline from checks (last 24 items)
-  const timeline = (checks?.checks ?? []).slice(0, 24).reverse();
+  const factors = [
+    { label: "Availability", key: "availability" as const, weight: "25%" },
+    { label: "Latency", key: "latency" as const, weight: "20%" },
+    { label: "Schema Stability", key: "schemaStability" as const, weight: "15%" },
+    { label: "Protocol Compliance", key: "protocolCompliance" as const, weight: "15%" },
+    { label: "Metadata Quality", key: "metadataQuality" as const, weight: "15%" },
+    { label: "Freshness", key: "freshness" as const, weight: "10%" },
+  ];
 
   return (
     <div className="space-y-8">
-      <Link href="/" className="inline-flex items-center gap-1.5 text-sm text-gray-400 hover:text-gray-200 transition-colors">
+      {/* Back link */}
+      <Link href="/" className="inline-flex items-center gap-1.5 text-sm text-gray-400 hover:text-green-400 transition-colors">
         ← Back to dashboard
       </Link>
 
       {/* Header */}
-      <section className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div className="space-y-2">
-          <div className="flex items-center gap-3">
-            <StatusDot status={server.currentStatus} />
-            <h1 className="text-3xl font-bold tracking-tight">{server.title || server.registryName}</h1>
-          </div>
-          {server.description && <p className="max-w-2xl text-gray-400">{server.description}</p>}
+      <section className="space-y-3">
+        <div className="flex items-center gap-3 flex-wrap">
+          <StatusDot status={server.currentStatus} />
+          <h1 className="text-3xl font-bold tracking-tight">{server.title || server.registryName}</h1>
+          <ScoreBadge score={server.trustScore} />
         </div>
-        <div className="flex-shrink-0">
-          <div className="text-center">
-            <p className="text-xs text-gray-500 uppercase tracking-wider">Trust Score</p>
-            <p className="mt-1 text-4xl font-bold">
-              <ScoreBadge score={server.trustScore} />
-            </p>
-          </div>
+        {server.description && <p className="text-gray-400 max-w-2xl">{server.description}</p>}
+
+        {/* Metadata pills */}
+        <div className="flex flex-wrap gap-2 text-xs">
+          <span className="rounded-md bg-gray-800 px-2.5 py-1 text-gray-400">{server.transportType}</span>
+          {server.version && <span className="rounded-md bg-gray-800 px-2.5 py-1 text-gray-400">v{server.version}</span>}
+          {server.repoUrl && (
+            <a href={server.repoUrl} target="_blank" rel="noopener" className="rounded-md bg-gray-800 px-2.5 py-1 text-gray-400 hover:text-green-400 transition-colors">
+              Repository ↗
+            </a>
+          )}
+          {server.websiteUrl && (
+            <a href={server.websiteUrl} target="_blank" rel="noopener" className="rounded-md bg-gray-800 px-2.5 py-1 text-gray-400 hover:text-green-400 transition-colors">
+              Website ↗
+            </a>
+          )}
         </div>
       </section>
 
-      {/* Metadata */}
-      <section className="rounded-xl border border-gray-800 bg-gray-900/50 p-5">
-        <dl className="grid gap-4 sm:grid-cols-3 lg:grid-cols-5">
-          <MetaItem label="Registry Name" value={server.registryName} />
-          <MetaItem label="Transport" value={server.transportType} />
-          {server.version && <MetaItem label="Version" value={server.version} />}
-          {server.repoUrl && <MetaItem label="Repository" value="GitHub →" href={server.repoUrl} />}
-          {server.websiteUrl && <MetaItem label="Website" value="Visit →" href={server.websiteUrl} />}
-        </dl>
-      </section>
+      {/* Two-column: Score breakdown + Status history */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        {/* Trust Score Breakdown */}
+        <section className="rounded-xl border border-gray-800 bg-gray-900/50 p-6 space-y-4">
+          <h2 className="text-lg font-semibold">Trust Score Breakdown</h2>
+          {score ? (
+            <div className="space-y-3">
+              {factors.map((f) => (
+                <ProgressBar key={f.key} label={f.label} value={score[f.key]} weight={f.weight} />
+              ))}
+              <div className="pt-2 border-t border-gray-800 flex justify-between">
+                <span className="text-gray-300 font-medium">Total Score</span>
+                <span className="text-xl font-bold text-gray-100">{Math.round(score.totalScore)}</span>
+              </div>
+            </div>
+          ) : (
+            <p className="text-gray-500 text-sm">No score data available yet.</p>
+          )}
+        </section>
 
-      {/* Score breakdown */}
-      {score && (
-        <section className="rounded-xl border border-gray-800 bg-gray-900/50 p-5 space-y-4">
-          <h2 className="text-lg font-semibold">Score Breakdown</h2>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <ScoreBar label="Availability" score={score.availability} weight={SCORE_WEIGHTS.availability} />
-            <ScoreBar label="Latency" score={score.latency} weight={SCORE_WEIGHTS.latency} />
-            <ScoreBar label="Schema Stability" score={score.schemaStability} weight={SCORE_WEIGHTS.schemaStability} />
-            <ScoreBar label="Protocol Compliance" score={score.protocolCompliance} weight={SCORE_WEIGHTS.protocolCompliance} />
-            <ScoreBar label="Metadata Quality" score={score.metadataQuality} weight={SCORE_WEIGHTS.metadataQuality} />
-            <ScoreBar label="Freshness" score={score.freshness} weight={SCORE_WEIGHTS.freshness} />
+        {/* Status History */}
+        <section className="rounded-xl border border-gray-800 bg-gray-900/50 p-6 space-y-4">
+          <h2 className="text-lg font-semibold">Status History (Last 24h)</h2>
+          <StatusTimeline checks={checks} />
+          <div className="flex gap-4 text-xs text-gray-500">
+            <span className="flex items-center gap-1"><span className="inline-block h-2.5 w-2.5 rounded-sm bg-green-400/80" /> Up</span>
+            <span className="flex items-center gap-1"><span className="inline-block h-2.5 w-2.5 rounded-sm bg-yellow-400/80" /> Degraded</span>
+            <span className="flex items-center gap-1"><span className="inline-block h-2.5 w-2.5 rounded-sm bg-red-400/80" /> Down</span>
           </div>
         </section>
-      )}
+      </div>
 
-      {/* Status timeline */}
-      {timeline.length > 0 && (
-        <section className="rounded-xl border border-gray-800 bg-gray-900/50 p-5 space-y-3">
-          <h2 className="text-lg font-semibold">Status History (Recent)</h2>
-          <div className="flex items-end gap-0.5 h-8">
-            {timeline.map((c: any, i: number) => {
-              const color =
-                c.status === "up" ? "bg-green-400" :
-                c.status === "down" ? "bg-red-400" :
-                c.status === "timeout" ? "bg-yellow-400" : "bg-gray-600";
-              return (
-                <div key={i} className={`flex-1 h-full rounded-sm ${color} opacity-80 hover:opacity-100 transition-opacity`} title={`${c.status} — ${new Date(c.checkedAt).toLocaleString()}`} />
-              );
-            })}
-          </div>
-          <div className="flex justify-between text-xs text-gray-600">
-            <span>Oldest</span>
-            <span>Latest</span>
-          </div>
-        </section>
-      )}
-
-      {/* Recent checks */}
-      {checks?.checks?.length > 0 && (
-        <section className="rounded-xl border border-gray-800 overflow-hidden">
-          <div className="bg-gray-900/80 px-5 py-3 border-b border-gray-800">
-            <h2 className="text-lg font-semibold">Recent Health Checks</h2>
-          </div>
-          <div className="overflow-x-auto">
+      {/* Recent Health Checks */}
+      <section className="space-y-4">
+        <h2 className="text-lg font-semibold">Recent Health Checks</h2>
+        {checks.length > 0 ? (
+          <div className="overflow-x-auto rounded-xl border border-gray-800">
             <table className="w-full text-left text-sm">
               <thead>
-                <tr className="border-b border-gray-800 text-xs uppercase tracking-wider text-gray-500">
-                  <th className="px-4 py-2.5">Time</th>
-                  <th className="px-4 py-2.5">Status</th>
-                  <th className="px-4 py-2.5">Level</th>
-                  <th className="px-4 py-2.5 hidden sm:table-cell">Latency</th>
-                  <th className="px-4 py-2.5 hidden md:table-cell">Tools</th>
-                  <th className="px-4 py-2.5 hidden lg:table-cell">Error</th>
+                <tr className="border-b border-gray-800 bg-gray-900/80 text-xs uppercase tracking-wider text-gray-500">
+                  <th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3">Time</th>
+                  <th className="px-4 py-3">Latency</th>
+                  <th className="px-4 py-3 hidden sm:table-cell">Tools</th>
+                  <th className="px-4 py-3 hidden md:table-cell">Error</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-800/50">
-                {checks.checks.map((c: any) => (
-                  <tr key={c.id} className="hover:bg-gray-800/30 transition-colors">
-                    <td className="px-4 py-2.5 text-gray-400 whitespace-nowrap">{new Date(c.checkedAt).toLocaleString()}</td>
-                    <td className="px-4 py-2.5"><CheckStatusBadge status={c.status} /></td>
-                    <td className="px-4 py-2.5 text-gray-400">{c.checkLevel}</td>
-                    <td className="px-4 py-2.5 text-gray-400 hidden sm:table-cell">{c.latencyMs !== null ? `${c.latencyMs}ms` : "—"}</td>
-                    <td className="px-4 py-2.5 text-gray-400 hidden md:table-cell">{c.toolCount ?? "—"}</td>
-                    <td className="px-4 py-2.5 text-gray-500 text-xs hidden lg:table-cell max-w-xs truncate">{c.errorMessage ?? "—"}</td>
+                {checks.slice(0, 20).map((c: any, i: number) => (
+                  <tr key={i} className="hover:bg-gray-800/30 transition-colors">
+                    <td className="px-4 py-3"><StatusDot status={c.status} /></td>
+                    <td className="px-4 py-3 text-gray-400 text-xs">{new Date(c.checkedAt).toLocaleString()}</td>
+                    <td className="px-4 py-3 text-gray-400">{c.latencyMs !== null ? `${c.latencyMs}ms` : "—"}</td>
+                    <td className="px-4 py-3 text-gray-400 hidden sm:table-cell">{c.toolCount ?? "—"}</td>
+                    <td className="px-4 py-3 text-red-400/80 text-xs hidden md:table-cell truncate max-w-xs">{c.errorMessage || "—"}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-        </section>
-      )}
+        ) : (
+          <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-8 text-center text-gray-500">
+            No health checks recorded yet.
+          </div>
+        )}
+      </section>
     </div>
   );
 }
