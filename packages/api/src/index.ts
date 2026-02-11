@@ -4,6 +4,8 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import PgBoss from "pg-boss";
 import { syncRegistry } from "./registry-sync.js";
+import { checkAndRecord, checkAllRemoteServers } from "./health-checker.ts";
+import pool from "./db.ts";
 
 const app = new Hono();
 
@@ -21,6 +23,22 @@ app.post("/api/sync", async (c) => {
     return c.json({ ok: true, serverssynced: count });
   } catch (err: any) {
     console.error("[POST /api/sync] error:", err);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+// Manual health check endpoint
+app.post("/api/check/:name{.+}", async (c) => {
+  const name = c.req.param("name");
+  try {
+    const { rows } = await pool.query(
+      "SELECT id FROM servers WHERE registry_name = $1",
+      [name]
+    );
+    if (!rows[0]) return c.json({ ok: false, error: "Server not found" }, 404);
+    const result = await checkAndRecord(rows[0].id);
+    return c.json({ ok: true, result });
+  } catch (err: any) {
     return c.json({ ok: false, error: err.message }, 500);
   }
 });
@@ -45,6 +63,17 @@ if (databaseUrl) {
       console.log("[pg-boss] running registry-sync job...");
       const count = await syncRegistry();
       console.log(`[pg-boss] registry-sync done — ${count} servers`);
+    });
+
+    // Health check job — every 15 minutes
+    const HEALTH_JOB = "health-check-all";
+    await boss.schedule(HEALTH_JOB, "*/15 * * * *");
+    console.log("[pg-boss] scheduled health-check-all every 15min");
+
+    await boss.work(HEALTH_JOB, async () => {
+      console.log("[pg-boss] running health-check-all...");
+      const stats = await checkAllRemoteServers();
+      console.log(`[pg-boss] health-check done — ${JSON.stringify(stats)}`);
     });
   });
 }
