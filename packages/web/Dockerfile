@@ -27,7 +27,7 @@ WORKDIR /app
 
 COPY --from=base /app/packages/web/.next/standalone ./
 COPY --from=base /app/packages/web/.next/static ./packages/web/.next/static
-COPY --from=base /app/packages/web/public ./packages/web/public 2>/dev/null || true
+COPY --from=base /app/packages/web/public ./packages/web/public
 
 EXPOSE 3000
 ENV PORT=3000
