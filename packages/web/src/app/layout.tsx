@@ -2,9 +2,44 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import "./globals.css";
 
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://mcphealth.io";
+
 export const metadata: Metadata = {
-  title: "MCPHealth — MCP Server Health Monitor",
-  description: "Real-time health monitoring and trust scores for MCP servers.",
+  title: {
+    default: "MCPHealth — MCP Server Health Monitor & Trust Scores",
+    template: "%s | MCPHealth",
+  },
+  description:
+    "Real-time health monitoring, uptime tracking, and trust scores for MCP servers. Check availability, latency, and protocol compliance.",
+  keywords: [
+    "MCP",
+    "Model Context Protocol",
+    "MCP server",
+    "health monitoring",
+    "trust score",
+    "uptime",
+    "server status",
+  ],
+  metadataBase: new URL(SITE_URL),
+  openGraph: {
+    title: "MCPHealth — MCP Server Health Monitor & Trust Scores",
+    description:
+      "Real-time health monitoring, uptime tracking, and trust scores for MCP servers.",
+    url: SITE_URL,
+    siteName: "MCPHealth",
+    type: "website",
+    images: [{ url: "/og", width: 1200, height: 630, alt: "MCPHealth" }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "MCPHealth — MCP Server Health Monitor",
+    description:
+      "Real-time health monitoring and trust scores for MCP servers.",
+    images: ["/og"],
+  },
+  icons: {
+    icon: "/favicon.svg",
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

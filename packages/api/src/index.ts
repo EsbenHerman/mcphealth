@@ -140,58 +140,65 @@ app.get("/api/servers", async (c) => {
   }
 });
 
-// ── GET /api/servers/:name — full server detail ──────
-app.get("/api/servers/:name{.+}/score", async (c) => {
-  const name = c.req.param("name");
-  try {
-    const breakdown = await getScoreBreakdown(name);
-    if (!breakdown) return c.json({ ok: false, error: "Server not found" }, 404);
-    return c.json({ ok: true, ...breakdown });
-  } catch (err: any) {
-    return c.json({ ok: false, error: err.message }, 500);
-  }
-});
+// ── Server detail routes ──────────────────────────────
+// Hono's {.+} is greedy and swallows /score and /checks suffixes,
+// so we use a single catch-all and parse the suffix manually.
+app.get("/api/servers/*", async (c) => {
+  const fullPath = c.req.path.replace("/api/servers/", "");
 
-app.get("/api/servers/:name{.+}/checks", async (c) => {
-  const name = c.req.param("name");
+  // Detect suffix
+  let name: string;
+  let action: "detail" | "score" | "checks";
+  if (fullPath.endsWith("/score")) {
+    name = fullPath.slice(0, -"/score".length);
+    action = "score";
+  } else if (fullPath.endsWith("/checks")) {
+    name = fullPath.slice(0, -"/checks".length);
+    action = "checks";
+  } else {
+    name = fullPath;
+    action = "detail";
+  }
+
+  if (!name) return c.json({ ok: false, error: "Server name required" }, 400);
+
   try {
+    if (action === "score") {
+      const breakdown = await getScoreBreakdown(name);
+      if (!breakdown) return c.json({ ok: false, error: "Server not found" }, 404);
+      return c.json({ ok: true, ...breakdown });
+    }
+
+    // Look up server for detail and checks
     const { rows: srv } = await pool.query(
-      "SELECT id FROM servers WHERE registry_name = $1", [name]
+      "SELECT * FROM servers WHERE registry_name = $1", [name]
     );
     if (!srv[0]) return c.json({ ok: false, error: "Server not found" }, 404);
 
-    const limit = Math.min(Math.max(parseInt(c.req.query("limit") || "100"), 1), 500);
-    const offset = Math.max(parseInt(c.req.query("offset") || "0"), 0);
-    const since = c.req.query("since") || new Date(Date.now() - 86400000).toISOString();
+    if (action === "checks") {
+      const limit = Math.min(Math.max(parseInt(c.req.query("limit") || "100"), 1), 500);
+      const offset = Math.max(parseInt(c.req.query("offset") || "0"), 0);
+      const since = c.req.query("since") || new Date(Date.now() - 86400000).toISOString();
 
-    const { rows: [{ total }] } = await pool.query(
-      "SELECT COUNT(*)::int AS total FROM health_checks WHERE server_id = $1 AND checked_at >= $2",
-      [srv[0].id, since]
-    );
+      const { rows: [{ total }] } = await pool.query(
+        "SELECT COUNT(*)::int AS total FROM health_checks WHERE server_id = $1 AND checked_at >= $2",
+        [srv[0].id, since]
+      );
 
-    const { rows: checks } = await pool.query(
-      `SELECT id, status, latency_ms, error_message, check_level, checked_at
-       FROM health_checks
-       WHERE server_id = $1 AND checked_at >= $2
-       ORDER BY checked_at DESC
-       LIMIT $3 OFFSET $4`,
-      [srv[0].id, since, limit, offset]
-    );
+      const { rows: checks } = await pool.query(
+        `SELECT id, status, latency_ms, error_message, check_level, checked_at
+         FROM health_checks
+         WHERE server_id = $1 AND checked_at >= $2
+         ORDER BY checked_at DESC
+         LIMIT $3 OFFSET $4`,
+        [srv[0].id, since, limit, offset]
+      );
 
-    return c.json({ ok: true, total, limit, offset, checks });
-  } catch (err: any) {
-    return c.json({ ok: false, error: err.message }, 500);
-  }
-});
+      return c.json({ ok: true, total, limit, offset, checks });
+    }
 
-app.get("/api/servers/:name{.+}", async (c) => {
-  const name = c.req.param("name");
-  try {
-    const { rows } = await pool.query(
-      "SELECT * FROM servers WHERE registry_name = $1", [name]
-    );
-    if (!rows[0]) return c.json({ ok: false, error: "Server not found" }, 404);
-    return c.json({ ok: true, server: rows[0] });
+    // detail
+    return c.json({ ok: true, server: srv[0] });
   } catch (err: any) {
     return c.json({ ok: false, error: err.message }, 500);
   }
@@ -215,6 +222,10 @@ if (databaseUrl) {
   boss.on("error", (err) => console.error("[pg-boss] error:", err));
 
   boss.start().then(async () => {
+    // Create queues first (pg-boss v10 requires explicit queue creation)
+    await boss.createQueue("registry-sync").catch(() => {});
+    await boss.createQueue("health-check-all").catch(() => {});
+    await boss.createQueue("trust-score-all").catch(() => {});
     console.log("[pg-boss] started");
 
     const SYNC_JOB = "registry-sync";
