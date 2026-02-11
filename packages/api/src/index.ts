@@ -5,6 +5,7 @@ import { cors } from "hono/cors";
 import PgBoss from "pg-boss";
 import { syncRegistry } from "./registry-sync.js";
 import { checkAndRecord, checkAllRemoteServers } from "./health-checker.ts";
+import { getScoreBreakdown, scoreAllServers } from "./trust-score.ts";
 import pool from "./db.ts";
 
 const app = new Hono();
@@ -43,6 +44,28 @@ app.post("/api/check/:name{.+}", async (c) => {
   }
 });
 
+// Score breakdown endpoint
+app.get("/api/servers/:name{.+}/score", async (c) => {
+  const name = c.req.param("name");
+  try {
+    const breakdown = await getScoreBreakdown(name);
+    if (!breakdown) return c.json({ ok: false, error: "Server not found" }, 404);
+    return c.json({ ok: true, ...breakdown });
+  } catch (err: any) {
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+// Manual score-all endpoint
+app.post("/api/scores/calculate", async (c) => {
+  try {
+    const stats = await scoreAllServers();
+    return c.json({ ok: true, ...stats });
+  } catch (err: any) {
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
 // pg-boss scheduler
 const databaseUrl = process.env.DATABASE_URL;
 if (databaseUrl) {
@@ -74,6 +97,21 @@ if (databaseUrl) {
       console.log("[pg-boss] running health-check-all...");
       const stats = await checkAllRemoteServers();
       console.log(`[pg-boss] health-check done — ${JSON.stringify(stats)}`);
+      // Score all servers after health checks complete
+      console.log("[pg-boss] calculating trust scores...");
+      const scoreStats = await scoreAllServers();
+      console.log(`[pg-boss] trust scores done — ${JSON.stringify(scoreStats)}`);
+    });
+
+    // Trust score recalculation — every 30 minutes
+    const SCORE_JOB = "trust-score-all";
+    await boss.schedule(SCORE_JOB, "*/30 * * * *");
+    console.log("[pg-boss] scheduled trust-score-all every 30min");
+
+    await boss.work(SCORE_JOB, async () => {
+      console.log("[pg-boss] running trust-score-all...");
+      const stats = await scoreAllServers();
+      console.log(`[pg-boss] trust-score done — ${JSON.stringify(stats)}`);
     });
   });
 }
