@@ -1,10 +1,46 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import type { Metadata } from "next";
 import { getServer, getServerScore, getServerChecks, ScoreBreakdown } from "@/lib/api";
 import { ScoreBadge } from "@/components/ScoreBadge";
 import { StatusDot } from "@/components/StatusDot";
 
 export const dynamic = "force-dynamic";
+
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://mcphealth.io";
+
+export async function generateMetadata({ params }: { params: Promise<{ name: string[] }> }): Promise<Metadata> {
+  const { name: nameParts } = await params;
+  const serverName = nameParts.join("/");
+  try {
+    const server = await getServer(serverName);
+    const title = server.title || serverName;
+    const description = server.description || `Health monitoring and trust score for ${title} MCP server.`;
+    const score = server.trustScore !== null ? Math.round(server.trustScore) : null;
+    const ogParams = new URLSearchParams({ title });
+    if (score !== null) ogParams.set("score", String(score));
+    if (server.currentStatus) ogParams.set("status", server.currentStatus);
+
+    return {
+      title,
+      description,
+      openGraph: {
+        title: `${title} — MCPHealth`,
+        description,
+        url: `${SITE_URL}/server/${encodeURIComponent(serverName)}`,
+        images: [{ url: `/og?${ogParams}`, width: 1200, height: 630, alt: title }],
+      },
+      twitter: {
+        card: "summary_large_image",
+        title: `${title} — MCPHealth`,
+        description,
+        images: [`/og?${ogParams}`],
+      },
+    };
+  } catch {
+    return { title: serverName };
+  }
+}
 
 export async function generateMetadata({ params }: { params: Promise<{ name: string[] }> }): Promise<Metadata> {
   const { name: nameParts } = await params;
