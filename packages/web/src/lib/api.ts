@@ -63,8 +63,9 @@ export function getServers(params: Record<string, string> = {}) {
   return apiFetch<ServerListResponse>(`/api/servers${qs ? `?${qs}` : ""}`);
 }
 
-export function getServer(name: string) {
-  return apiFetch<any>(`/api/servers/${encodeURIComponent(name)}`);
+export async function getServer(name: string) {
+  const res = await apiFetch<{ ok: boolean; server: any }>(`/api/servers/${encodeURIComponent(name)}`);
+  return res.server;
 }
 
 export function getServerChecks(name: string, params: Record<string, string> = {}) {

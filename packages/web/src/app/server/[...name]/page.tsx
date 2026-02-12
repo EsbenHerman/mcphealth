@@ -119,12 +119,12 @@ export default async function ServerDetailPage({ params }: { params: Promise<{ n
   }
 
   const factors = [
-    { label: "Availability", key: "availability" as keyof ScoreBreakdown["factors"], weight: "25%" },
-    { label: "Latency", key: "latency" as keyof ScoreBreakdown["factors"], weight: "20%" },
-    { label: "Schema Stability", key: "schemaStability" as keyof ScoreBreakdown["factors"], weight: "15%" },
+    { label: "Availability", key: "availability" as keyof ScoreBreakdown["factors"], weight: "35%" },
+    { label: "Latency", key: "latency" as keyof ScoreBreakdown["factors"], weight: "15%" },
+    { label: "Schema Stability", key: "schemaStability" as keyof ScoreBreakdown["factors"], weight: "20%" },
     { label: "Protocol Compliance", key: "protocolCompliance" as keyof ScoreBreakdown["factors"], weight: "15%" },
-    { label: "Metadata Quality", key: "metadataQuality" as keyof ScoreBreakdown["factors"], weight: "15%" },
-    { label: "Freshness", key: "freshness" as keyof ScoreBreakdown["factors"], weight: "10%" },
+    { label: "Metadata Quality", key: "metadataQuality" as keyof ScoreBreakdown["factors"], weight: "10%" },
+    { label: "Freshness", key: "freshness" as keyof ScoreBreakdown["factors"], weight: "5%" },
   ];
 
   return (
