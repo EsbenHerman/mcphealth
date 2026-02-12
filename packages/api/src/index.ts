@@ -71,7 +71,7 @@ app.get("/api/stats", async (c) => {
         ROUND(AVG(latency_p50) FILTER (WHERE latency_p50 IS NOT NULL)::numeric, 0) AS avg_latency_p50
       FROM servers
     `);
-    return c.json({ ok: true, ...stats });
+    return c.json({ ok: true, ...camelRow(stats) });
   } catch (err: any) {
     return c.json({ ok: false, error: err.message }, 500);
   }
@@ -169,6 +169,9 @@ app.get("/api/servers/*", async (c) => {
     name = fullPath;
     action = "detail";
   }
+
+  // Decode percent-encoded slashes from URL
+  name = decodeURIComponent(name);
 
   if (!name) return c.json({ ok: false, error: "Server name required" }, 400);
 

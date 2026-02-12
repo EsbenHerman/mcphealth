@@ -24,3 +24,8 @@
 body {
   background: var(--color-gray-950);
 }
+
+/* Clean look: no border radius */
+* {
+  border-radius: 0 !important;
+}

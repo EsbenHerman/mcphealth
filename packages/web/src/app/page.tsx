@@ -93,7 +93,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
                       <StatusDot status={s.currentStatus} />
                     </td>
                     <td className="px-4 py-3">
-                      <Link href={`/server/${encodeURIComponent(s.registryName)}`} className="group">
+                      <Link href={`/server/${s.registryName}`} className="group">
                         <p className="font-medium text-gray-100 group-hover:text-green-400 transition-colors">{s.title || s.registryName}</p>
                         {s.description && (
                           <p className="mt-0.5 text-xs text-gray-500 line-clamp-1 max-w-md">{s.description}</p>
