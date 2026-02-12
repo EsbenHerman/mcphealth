@@ -36,14 +36,26 @@ export interface StatsResponse {
   avgTrustScore: number | null;
 }
 
+export interface ScoreFactor {
+  score: number | null;
+  weight: number;
+  weighted: number;
+  raw?: any;
+}
+
 export interface ScoreBreakdown {
   totalScore: number;
-  availability: number | null;
-  latency: number | null;
-  schemaStability: number | null;
-  protocolCompliance: number | null;
-  metadataQuality: number | null;
-  freshness: number | null;
+  tier: string;
+  tierEmoji: string;
+  isLocalOnly: boolean;
+  factors: {
+    availability: ScoreFactor;
+    latency: ScoreFactor;
+    schemaStability: ScoreFactor;
+    protocolCompliance: ScoreFactor;
+    metadataQuality: ScoreFactor;
+    freshness: ScoreFactor;
+  };
 }
 
 export function getServers(params: Record<string, string> = {}) {

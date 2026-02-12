@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { getServer, getServerScore, getServerChecks, ScoreBreakdown } from "@/lib/api";
+import { getServer, getServerScore, getServerChecks, type ScoreBreakdown } from "@/lib/api";
 import { ScoreBadge } from "@/components/ScoreBadge";
 import { StatusDot } from "@/components/StatusDot";
 
@@ -119,12 +119,12 @@ export default async function ServerDetailPage({ params }: { params: Promise<{ n
   }
 
   const factors = [
-    { label: "Availability", key: "availability" as const, weight: "25%" },
-    { label: "Latency", key: "latency" as const, weight: "20%" },
-    { label: "Schema Stability", key: "schemaStability" as const, weight: "15%" },
-    { label: "Protocol Compliance", key: "protocolCompliance" as const, weight: "15%" },
-    { label: "Metadata Quality", key: "metadataQuality" as const, weight: "15%" },
-    { label: "Freshness", key: "freshness" as const, weight: "10%" },
+    { label: "Availability", key: "availability" as keyof ScoreBreakdown["factors"], weight: "25%" },
+    { label: "Latency", key: "latency" as keyof ScoreBreakdown["factors"], weight: "20%" },
+    { label: "Schema Stability", key: "schemaStability" as keyof ScoreBreakdown["factors"], weight: "15%" },
+    { label: "Protocol Compliance", key: "protocolCompliance" as keyof ScoreBreakdown["factors"], weight: "15%" },
+    { label: "Metadata Quality", key: "metadataQuality" as keyof ScoreBreakdown["factors"], weight: "15%" },
+    { label: "Freshness", key: "freshness" as keyof ScoreBreakdown["factors"], weight: "10%" },
   ];
 
   return (
@@ -168,7 +168,7 @@ export default async function ServerDetailPage({ params }: { params: Promise<{ n
           {score ? (
             <div className="space-y-3">
               {factors.map((f) => (
-                <ProgressBar key={f.key} label={f.label} value={score[f.key]} weight={f.weight} />
+                <ProgressBar key={f.key} label={f.label} value={score.factors[f.key]?.score ?? null} weight={f.weight} />
               ))}
               <div className="pt-2 border-t border-gray-800 flex justify-between">
                 <span className="text-gray-300 font-medium">Total Score</span>
