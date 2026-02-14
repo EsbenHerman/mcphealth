@@ -40,6 +40,7 @@ export function ServerFilters() {
         <option value="down">Down</option>
         <option value="degraded">Degraded</option>
         <option value="unknown">Unknown</option>
+        <option value="local">Local (stdio)</option>
       </select>
       <select
         defaultValue={searchParams.get("transport_type") ?? ""}

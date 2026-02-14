@@ -53,10 +53,11 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
 
       {/* Stats */}
       {stats && (
-        <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
           <StatCard label="Total Servers" value={stats.totalServers} />
           <StatCard label="Servers Up" value={stats.serversUp} accent="text-green-400" />
           <StatCard label="Servers Down" value={stats.serversDown} accent="text-red-400" />
+          <StatCard label="Local Only (stdio)" value={stats.localOnlyServers} accent="text-gray-400" />
           <StatCard label="Avg Trust Score" value={stats.avgTrustScore !== null ? Math.round(stats.avgTrustScore) : "—"} accent="text-yellow-400" />
         </section>
       )}
@@ -110,7 +111,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
                       {s.latencyP50 !== null ? `${s.latencyP50}ms` : "—"}
                     </td>
                     <td className="px-4 py-3 hidden sm:table-cell text-gray-400">
-                      {s.uptime24h !== null ? `${(s.uptime24h * 100).toFixed(1)}%` : "—"}
+                      {s.uptime24h !== null ? `${Number(s.uptime24h).toFixed(1)}%` : "—"}
                     </td>
                   </tr>
                 ))}

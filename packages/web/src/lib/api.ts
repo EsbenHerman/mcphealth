@@ -33,6 +33,8 @@ export interface StatsResponse {
   serversUp: number;
   serversDown: number;
   serversUnknown: number;
+  remoteServers: number;
+  localOnlyServers: number;
   avgTrustScore: number | null;
 }
 

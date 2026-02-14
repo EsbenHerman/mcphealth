@@ -227,6 +227,15 @@ app.post("/api/scores/calculate", async (c) => {
   }
 });
 
+// Mark stdio/local servers that can't be health-checked
+async function markLocalServers() {
+  const { rowCount } = await pool.query(
+    "UPDATE servers SET current_status = 'local' WHERE remote_url IS NULL AND current_status != 'local'"
+  );
+  if (rowCount && rowCount > 0) console.log(`[startup] marked ${rowCount} local-only servers`);
+}
+markLocalServers().catch(console.error);
+
 // pg-boss scheduler
 const databaseUrl = process.env.DATABASE_URL;
 if (databaseUrl) {
@@ -251,6 +260,7 @@ if (databaseUrl) {
       console.log("[pg-boss] running registry-sync job...");
       const count = await syncRegistry();
       console.log(`[pg-boss] registry-sync done — ${count} servers`);
+      await markLocalServers();
     });
 
     // Health check job — every 15 minutes
