@@ -227,6 +227,112 @@ app.post("/api/scores/calculate", async (c) => {
   }
 });
 
+// ── GET /api/badge/:name — SVG status badge ──────────
+app.get("/api/badge/*", async (c) => {
+  const name = decodeURIComponent(c.req.path.replace("/api/badge/", ""));
+  if (!name) return c.text("Missing server name", 400);
+
+  try {
+    const { rows } = await pool.query(
+      "SELECT trust_score, current_status FROM servers WHERE registry_name = $1",
+      [name]
+    );
+    if (!rows[0]) return c.text("Server not found", 404);
+
+    const score = rows[0].trust_score != null ? Math.round(rows[0].trust_score) : "N/A";
+    const status = rows[0].current_status || "unknown";
+
+    const colorMap: Record<string, string> = {
+      up: "#22c55e",
+      down: "#ef4444",
+      degraded: "#f59e0b",
+      local: "#6b7280",
+      unknown: "#6b7280",
+    };
+    const color = colorMap[status] || "#6b7280";
+
+    const label = "MCPHealth";
+    const value = `${score} · ${status}`;
+    const labelWidth = label.length * 7 + 10;
+    const valueWidth = value.length * 7 + 10;
+    const totalWidth = labelWidth + valueWidth;
+
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${totalWidth}" height="20" role="img" aria-label="${label}: ${value}">
+  <linearGradient id="s" x2="0" y2="100%"><stop offset="0" stop-color="#bbb" stop-opacity=".1"/><stop offset="1" stop-opacity=".1"/></linearGradient>
+  <clipPath id="r"><rect width="${totalWidth}" height="20" rx="3" fill="#fff"/></clipPath>
+  <g clip-path="url(#r)">
+    <rect width="${labelWidth}" height="20" fill="#555"/>
+    <rect x="${labelWidth}" width="${valueWidth}" height="20" fill="${color}"/>
+    <rect width="${totalWidth}" height="20" fill="url(#s)"/>
+  </g>
+  <g fill="#fff" text-anchor="middle" font-family="Verdana,Geneva,DejaVu Sans,sans-serif" text-rendering="geometricPrecision" font-size="11">
+    <text x="${labelWidth / 2}" y="14">${label}</text>
+    <text x="${labelWidth + valueWidth / 2}" y="14">${value}</text>
+  </g>
+</svg>`;
+
+    c.header("Content-Type", "image/svg+xml");
+    c.header("Cache-Control", "public, max-age=300");
+    return c.body(svg);
+  } catch (err: any) {
+    return c.text("Error generating badge", 500);
+  }
+});
+
+// ── GET /api/feed — RSS feed of status changes ──────────
+app.get("/api/feed", async (c) => {
+  try {
+    // Get recent health checks that show status transitions (last 24h)
+    const { rows } = await pool.query(`
+      SELECT s.registry_name, s.title, hc.status, hc.checked_at, hc.error_message
+      FROM health_checks hc
+      JOIN servers s ON s.id = hc.server_id
+      WHERE hc.checked_at >= NOW() - INTERVAL '24 hours'
+      ORDER BY hc.checked_at DESC
+      LIMIT 100
+    `);
+
+    const baseUrl = process.env.PUBLIC_URL || "https://mcphealth.io";
+    const now = new Date().toUTCString();
+
+    const items = rows.map((r: any) => {
+      const title = `${r.title || r.registry_name} — ${r.status}`;
+      const link = `${baseUrl}/server/${encodeURIComponent(r.registry_name)}`;
+      const desc = r.error_message ? `Error: ${r.error_message}` : `Status: ${r.status}`;
+      const pubDate = new Date(r.checked_at).toUTCString();
+      return `    <item>
+      <title>${escapeXml(title)}</title>
+      <link>${escapeXml(link)}</link>
+      <description>${escapeXml(desc)}</description>
+      <pubDate>${pubDate}</pubDate>
+      <guid>${escapeXml(link)}#${r.checked_at}</guid>
+    </item>`;
+    }).join("\n");
+
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>MCPHealth — Status Feed</title>
+    <link>${baseUrl}</link>
+    <description>Recent health check results for MCP servers</description>
+    <lastBuildDate>${now}</lastBuildDate>
+    <atom:link href="${baseUrl}/api/feed" rel="self" type="application/rss+xml"/>
+${items}
+  </channel>
+</rss>`;
+
+    c.header("Content-Type", "application/rss+xml; charset=utf-8");
+    c.header("Cache-Control", "public, max-age=300");
+    return c.body(xml);
+  } catch (err: any) {
+    return c.text("Error generating feed", 500);
+  }
+});
+
+function escapeXml(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
 // Mark stdio/local servers that can't be health-checked
 async function markLocalServers() {
   const { rowCount } = await pool.query(
