@@ -4,6 +4,7 @@ import { ScoreBadge } from "@/components/ScoreBadge";
 import { StatusDot } from "@/components/StatusDot";
 import { ServerFilters } from "@/components/ServerFilters";
 import { Pagination } from "@/components/Pagination";
+import { Landing } from "@/components/Landing";
 import { Suspense } from "react";
 
 function StatCard({ label, value, accent }: { label: string; value: string | number; accent?: string }) {
@@ -37,19 +38,11 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
 
   return (
     <div className="space-y-8">
-      {/* Hero */}
-      <section className="relative">
-        <div className="absolute -top-20 left-1/2 -translate-x-1/2 h-40 w-80 bg-green-500/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="relative space-y-3">
-          <h2 className="text-4xl font-bold tracking-tight sm:text-5xl">
-            MCP Server Health
-            <span className="text-green-400"> & Trust Scores</span>
-          </h2>
-          <p className="max-w-2xl text-gray-400">
-            Real-time monitoring and trust scores for MCP servers from the official registry.
-          </p>
-        </div>
-      </section>
+      {/* Landing page */}
+      {stats && <Landing totalServers={stats.totalServers} avgScore={stats.avgTrustScore} />}
+
+      {/* Dashboard */}
+      <div id="dashboard" className="scroll-mt-24" />
 
       {/* Stats */}
       {stats && (
