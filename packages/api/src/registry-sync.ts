@@ -83,7 +83,7 @@ export async function syncRegistry(): Promise<number> {
       const iconUrl = s.icons?.[0]?.src ?? null;
       const repoUrl = s.repository?.url ?? null;
 
-      await pool.query(
+      const { rows: upsertRows } = await pool.query(
         `INSERT INTO servers (
           registry_name, title, description, version,
           repo_url, website_url, icon_url,
@@ -102,7 +102,8 @@ export async function syncRegistry(): Promise<number> {
           registry_status = EXCLUDED.registry_status,
           published_at = EXCLUDED.published_at,
           registry_updated_at = EXCLUDED.registry_updated_at,
-          last_synced_at = now()`,
+          last_synced_at = now()
+        RETURNING id, (xmax = 0) AS inserted`,
         [
           s.name,
           s.title ?? null,
@@ -118,6 +119,15 @@ export async function syncRegistry(): Promise<number> {
           meta.updatedAt,
         ]
       );
+
+      // Emit server_added event for new servers
+      if (upsertRows[0]?.inserted) {
+        await pool.query(
+          "INSERT INTO server_events (server_id, event_type, new_value) VALUES ($1, 'server_added', $2)",
+          [upsertRows[0].id, s.name]
+        );
+      }
+
       totalUpserted++;
     }
 

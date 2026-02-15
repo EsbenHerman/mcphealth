@@ -262,7 +262,19 @@ export async function scoreAllServers(): Promise<{ scored: number; errors: numbe
     const batch = servers.slice(i, i + BATCH);
     const results = await Promise.allSettled(
       batch.map(async (s) => {
+        // Get old score before calculating new one
+        const { rows: [oldRow] } = await pool.query("SELECT trust_score FROM servers WHERE id = $1", [s.id]);
+        const oldScore = oldRow?.trust_score;
+
         const breakdown = await calculateScore(s.id);
+
+        // Emit score_change event if difference >= 5
+        if (oldScore != null && Math.abs(breakdown.totalScore - oldScore) >= 5) {
+          await pool.query(
+            "INSERT INTO server_events (server_id, event_type, old_value, new_value) VALUES ($1, 'score_change', $2, $3)",
+            [s.id, String(Math.round(oldScore)), String(breakdown.totalScore)]
+          );
+        }
 
         // Store in score_history
         await pool.query(

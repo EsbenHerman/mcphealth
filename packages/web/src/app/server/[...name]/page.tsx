@@ -148,6 +148,16 @@ export default async function ServerDetailPage({ params }: { params: Promise<{ n
 
         {/* Metadata pills */}
         <div className="flex flex-wrap gap-2 text-xs">
+          <a
+            href={`https://api.mcphealth.dev/api/feed/${encodeURIComponent(serverName)}`}
+            target="_blank"
+            rel="noopener"
+            className="inline-flex items-center gap-1 rounded-md bg-orange-500/10 border border-orange-500/20 px-2.5 py-1 text-orange-400 hover:text-orange-300 transition-colors"
+            title="RSS feed for this server"
+          >
+            <svg className="h-3 w-3" viewBox="0 0 24 24" fill="currentColor"><circle cx="6.18" cy="17.82" r="2.18"/><path d="M4 4.44v2.83c7.03 0 12.73 5.7 12.73 12.73h2.83c0-8.59-6.97-15.56-15.56-15.56zm0 5.66v2.83c3.9 0 7.07 3.17 7.07 7.07h2.83c0-5.47-4.43-9.9-9.9-9.9z"/></svg>
+            RSS
+          </a>
           <span className="rounded-md bg-gray-800 px-2.5 py-1 text-gray-400">{server.transportType}</span>
           {server.version && <span className="rounded-md bg-gray-800 px-2.5 py-1 text-gray-400">v{server.version}</span>}
           {server.repoUrl && (

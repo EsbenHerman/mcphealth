@@ -424,44 +424,125 @@ app.get("/api/badge/*", async (c) => {
   }
 });
 
-// ── GET /api/feed — RSS feed of status changes ──────────
-app.get("/api/feed", async (c) => {
-  try {
-    // Get recent health checks that show status transitions (last 24h)
-    const { rows } = await pool.query(`
-      SELECT s.registry_name, s.title, hc.status, hc.checked_at, hc.error_message
-      FROM health_checks hc
-      JOIN servers s ON s.id = hc.server_id
-      WHERE hc.checked_at >= NOW() - INTERVAL '24 hours'
-      ORDER BY hc.checked_at DESC
-      LIMIT 100
-    `);
+// ── RSS Feed helpers ──────────────────────────────────
 
-    const baseUrl = process.env.PUBLIC_URL || "https://mcphealth.dev";
-    const now = new Date().toUTCString();
+function eventToItem(e: any, baseUrl: string): string {
+  const serverName = e.title || e.registry_name;
+  const link = `${baseUrl}/server/${encodeURIComponent(e.registry_name)}`;
+  const pubDate = new Date(e.created_at).toUTCString();
+  let title: string;
+  let desc: string;
 
-    const items = rows.map((r: any) => {
-      const title = `${r.title || r.registry_name} — ${r.status}`;
-      const link = `${baseUrl}/server/${encodeURIComponent(r.registry_name)}`;
-      const desc = r.error_message ? `Error: ${r.error_message}` : `Status: ${r.status}`;
-      const pubDate = new Date(r.checked_at).toUTCString();
-      return `    <item>
+  switch (e.event_type) {
+    case "status_change":
+      title = e.new_value === "down" || e.new_value === "timeout"
+        ? `${serverName} went down`
+        : e.new_value === "up"
+        ? `${serverName} is back up`
+        : `${serverName} status: ${e.new_value}`;
+      desc = `Status changed from ${e.old_value} to ${e.new_value}`;
+      break;
+    case "server_added":
+      title = `New server: ${e.new_value}`;
+      desc = `${e.new_value} was added to the registry`;
+      break;
+    case "score_change":
+      title = `${serverName} trust score: ${e.old_value} → ${e.new_value}`;
+      desc = `Trust score changed from ${e.old_value} to ${e.new_value}`;
+      break;
+    case "compliance_change":
+      title = `${serverName} failed compliance check`;
+      desc = `Compliance changed from ${e.old_value} to ${e.new_value}`;
+      break;
+    default:
+      title = `${serverName}: ${e.event_type}`;
+      desc = `${e.old_value || ""} → ${e.new_value}`;
+  }
+
+  return `    <item>
       <title>${escapeXml(title)}</title>
       <link>${escapeXml(link)}</link>
       <description>${escapeXml(desc)}</description>
       <pubDate>${pubDate}</pubDate>
-      <guid>${escapeXml(link)}#${r.checked_at}</guid>
+      <guid isPermaLink="false">mcphealth-event-${e.id}</guid>
     </item>`;
-    }).join("\n");
+}
+
+// ── GET /api/feed — Global RSS feed ──────────────────
+app.get("/api/feed", async (c) => {
+  try {
+    const { rows } = await pool.query(`
+      SELECT e.id, e.event_type, e.old_value, e.new_value, e.created_at,
+             s.registry_name, s.title
+      FROM server_events e
+      JOIN servers s ON s.id = e.server_id
+      WHERE e.event_type IN ('status_change', 'server_added')
+      ORDER BY e.created_at DESC
+      LIMIT 100
+    `);
+
+    const baseUrl = process.env.PUBLIC_URL || "https://mcphealth.dev";
+    const apiBase = process.env.API_BASE_URL || "https://api.mcphealth.dev";
+    const now = new Date().toUTCString();
+    const items = rows.map((r: any) => eventToItem(r, baseUrl)).join("\n");
 
     const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
   <channel>
     <title>MCPHealth — Status Feed</title>
     <link>${baseUrl}</link>
-    <description>Recent health check results for MCP servers</description>
+    <description>Status changes and new servers on MCPHealth</description>
     <lastBuildDate>${now}</lastBuildDate>
-    <atom:link href="${baseUrl}/api/feed" rel="self" type="application/rss+xml"/>
+    <atom:link href="${apiBase}/api/feed" rel="self" type="application/rss+xml"/>
+${items}
+  </channel>
+</rss>`;
+
+    c.header("Content-Type", "application/rss+xml; charset=utf-8");
+    c.header("Cache-Control", "public, max-age=300");
+    return c.body(xml);
+  } catch (err: any) {
+    return c.text("Error generating feed", 500);
+  }
+});
+
+// ── GET /api/feed/:name — Per-server RSS feed ────────
+app.get("/api/feed/*", async (c) => {
+  const name = decodeURIComponent(c.req.path.replace("/api/feed/", ""));
+  if (!name) return c.text("Missing server name", 400);
+
+  try {
+    const { rows: srv } = await pool.query(
+      "SELECT id, registry_name, title FROM servers WHERE registry_name = $1",
+      [name]
+    );
+    if (!srv[0]) return c.text("Server not found", 404);
+
+    const { rows } = await pool.query(`
+      SELECT e.id, e.event_type, e.old_value, e.new_value, e.created_at,
+             s.registry_name, s.title
+      FROM server_events e
+      JOIN servers s ON s.id = e.server_id
+      WHERE e.server_id = $1
+        AND e.event_type IN ('status_change', 'score_change', 'compliance_change')
+      ORDER BY e.created_at DESC
+      LIMIT 100
+    `, [srv[0].id]);
+
+    const baseUrl = process.env.PUBLIC_URL || "https://mcphealth.dev";
+    const apiBase = process.env.API_BASE_URL || "https://api.mcphealth.dev";
+    const now = new Date().toUTCString();
+    const serverTitle = srv[0].title || srv[0].registry_name;
+    const items = rows.map((r: any) => eventToItem(r, baseUrl)).join("\n");
+
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>MCPHealth — ${escapeXml(serverTitle)}</title>
+    <link>${baseUrl}/server/${encodeURIComponent(name)}</link>
+    <description>Events for ${escapeXml(serverTitle)} on MCPHealth</description>
+    <lastBuildDate>${now}</lastBuildDate>
+    <atom:link href="${apiBase}/api/feed/${encodeURIComponent(name)}" rel="self" type="application/rss+xml"/>
 ${items}
   </channel>
 </rss>`;

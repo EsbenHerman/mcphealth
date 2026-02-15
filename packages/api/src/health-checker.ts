@@ -129,6 +129,19 @@ export async function checkAndRecord(serverId: string): Promise<CheckResult> {
     [serverId, result.status, result.latency_ms, result.error_message, result.tool_count, result.tools_hash]
   );
 
+  // Emit status_change event if status changed
+  const { rows: prevRows } = await pool.query(
+    "SELECT current_status FROM servers WHERE id = $1",
+    [serverId]
+  );
+  const oldStatus = prevRows[0]?.current_status;
+  if (oldStatus && oldStatus !== result.status) {
+    await pool.query(
+      "INSERT INTO server_events (server_id, event_type, old_value, new_value) VALUES ($1, 'status_change', $2, $3)",
+      [serverId, oldStatus, result.status]
+    );
+  }
+
   // Update server current_status
   await pool.query(
     "UPDATE servers SET current_status = $1 WHERE id = $2",
@@ -333,6 +346,13 @@ export async function complianceCheckAndRecord(serverId: string): Promise<Compli
 
   const result = await checkCompliance(rows[0].remote_url, rows[0].transport_type);
 
+  // Check previous compliance result for event emission
+  const { rows: prevComp } = await pool.query(
+    "SELECT compliance_pass FROM health_checks WHERE server_id = $1 AND check_level = 'compliance' AND compliance_pass IS NOT NULL ORDER BY checked_at DESC LIMIT 1",
+    [serverId]
+  );
+  const prevPass = prevComp[0]?.compliance_pass;
+
   await pool.query(
     `INSERT INTO health_checks (id, server_id, checked_at, status, latency_ms, error_message, compliance_pass, check_level)
      VALUES (gen_random_uuid(), $1, now(), $2, 0, $3, $4, 'compliance')`,
@@ -343,6 +363,14 @@ export async function complianceCheckAndRecord(serverId: string): Promise<Compli
       result.pass,
     ]
   );
+
+  // Emit compliance_change event if went from pass to fail
+  if (prevPass === true && !result.pass) {
+    await pool.query(
+      "INSERT INTO server_events (server_id, event_type, old_value, new_value) VALUES ($1, 'compliance_change', 'pass', 'fail')",
+      [serverId]
+    );
+  }
 
   return result;
 }
