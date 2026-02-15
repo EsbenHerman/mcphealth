@@ -11,7 +11,7 @@ function Hero() {
 
       <div className="relative space-y-6 max-w-3xl mx-auto">
         <p className="inline-block rounded-full border border-green-500/20 bg-green-500/5 px-4 py-1.5 text-xs font-medium text-green-400 tracking-wide uppercase">
-          Open-source MCP monitoring
+          MCP monitoring
         </p>
         <h1 className="text-5xl sm:text-6xl font-extrabold tracking-tight leading-[1.1]">
           Know which MCP servers

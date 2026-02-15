@@ -55,14 +55,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <nav className="flex items-center gap-6 text-sm text-gray-400">
               <Link href="/" className="hover:text-gray-100 transition-colors">Dashboard</Link>
               <Link href="/docs" className="hover:text-gray-100 transition-colors">Docs</Link>
-              <a href="https://github.com/EsbenHerman/mcphealth" target="_blank" rel="noopener" className="hover:text-gray-100 transition-colors">GitHub</a>
             </nav>
           </div>
         </header>
         <main className="mx-auto max-w-6xl px-6 py-8">{children}</main>
         <footer className="border-t border-gray-800/50 mt-16">
           <div className="mx-auto max-w-6xl px-6 py-6 text-center text-xs text-gray-600">
-            MCPHealth — Open-source MCP server monitoring
+            MCPHealth — MCP server monitoring
           </div>
         </footer>
       </body>
