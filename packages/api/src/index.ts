@@ -20,7 +20,17 @@ function camelRow(row: Record<string, any>): Record<string, any> {
 
 const app = new Hono();
 
-app.use("/*", cors());
+app.use(
+  "/*",
+  cors({
+    origin: [
+      "https://mcphealth.dev",
+      "https://www.mcphealth.dev",
+      "http://localhost:3000",
+      "http://localhost:3001",
+    ],
+  })
+);
 
 app.get("/health", (c) =>
   c.json({ status: "ok", timestamp: new Date().toISOString() })
