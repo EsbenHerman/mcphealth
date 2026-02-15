@@ -72,6 +72,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
       </Suspense>
 
       {/* Server list */}
+      <div id="servers" className="scroll-mt-24" />
       {error ? (
         <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-8 text-center text-gray-400">
           <p className="text-lg font-medium">Unable to connect to API</p>
