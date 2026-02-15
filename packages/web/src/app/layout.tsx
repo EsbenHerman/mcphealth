@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import "./globals.css";
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://mcphealth.io";
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://mcphealth.dev";
 
 export const metadata: Metadata = {
   title: {

@@ -6,7 +6,7 @@ import { StatusDot } from "@/components/StatusDot";
 
 export const dynamic = "force-dynamic";
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://mcphealth.io";
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://mcphealth.dev";
 
 export async function generateMetadata({ params }: { params: Promise<{ name: string[] }> }): Promise<Metadata> {
   const { name: nameParts } = await params;

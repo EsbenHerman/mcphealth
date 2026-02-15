@@ -91,7 +91,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
                 {serverData.servers.map((s) => (
                   <tr key={s.registryName} className="hover:bg-gray-800/30 transition-colors">
                     <td className="px-4 py-3">
-                      <StatusDot status={s.currentStatus} />
+                      <StatusDot status={s.currentStatus} showLabel />
                     </td>
                     <td className="px-4 py-3">
                       <Link href={`/server/${s.registryName}`} className="group">
