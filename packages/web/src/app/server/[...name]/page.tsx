@@ -163,6 +163,29 @@ export default async function ServerDetailPage({ params }: { params: Promise<{ n
         </div>
       </section>
 
+      {/* Capabilities (tools & resources) */}
+      {server.capabilities && server.capabilities.length > 0 && (
+        <section className="space-y-3">
+          <h2 className="text-lg font-semibold">Capabilities</h2>
+          <div className="flex flex-wrap gap-2">
+            {server.capabilities.map((cap: any) => (
+              <span
+                key={`${cap.capabilityType}-${cap.name}`}
+                className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${
+                  cap.capabilityType === "tool"
+                    ? "bg-purple-500/10 text-purple-300 border border-purple-500/20"
+                    : "bg-blue-500/10 text-blue-300 border border-blue-500/20"
+                }`}
+                title={cap.description || undefined}
+              >
+                <span>{cap.capabilityType === "tool" ? "🔧" : "📦"}</span>
+                {cap.name}
+              </span>
+            ))}
+          </div>
+        </section>
+      )}
+
       {/* Local-only notice */}
       {(server.currentStatus === "local" || server.currentStatus === "unknown") && (
         <section className="rounded-xl border border-blue-500/20 bg-blue-500/5 p-5 flex gap-3 items-start">

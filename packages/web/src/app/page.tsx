@@ -22,6 +22,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
   if (params.search) apiParams.search = params.search;
   if (params.status) apiParams.status = params.status;
   if (params.transport_type) apiParams.transport_type = params.transport_type;
+  if (params.capability) apiParams.capability = params.capability;
   if (params.sort) { apiParams.sort = params.sort; apiParams.order = "desc"; }
   apiParams.limit = "20";
   if (params.offset) apiParams.offset = params.offset;

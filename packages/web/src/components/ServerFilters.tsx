@@ -52,6 +52,13 @@ export function ServerFilters() {
         <option value="sse">SSE</option>
         <option value="stdio">Stdio</option>
       </select>
+      <input
+        type="search"
+        placeholder="Filter by capability…"
+        defaultValue={searchParams.get("capability") ?? ""}
+        onChange={(e) => update("capability", e.target.value)}
+        className={`${inputCls} w-full sm:w-52`}
+      />
       <select
         defaultValue={searchParams.get("sort") ?? ""}
         onChange={(e) => update("sort", e.target.value)}

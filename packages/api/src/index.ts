@@ -87,6 +87,47 @@ app.get("/api/stats", async (c) => {
   }
 });
 
+// ── GET /api/capabilities — list all known capabilities with server counts ──
+app.get("/api/capabilities", async (c) => {
+  try {
+    const search = c.req.query("search") || null;
+    const type = c.req.query("type") || null;
+    const limit = Math.min(Math.max(parseInt(c.req.query("limit") || "100"), 1), 500);
+
+    const conditions: string[] = [];
+    const params: any[] = [];
+    let idx = 1;
+
+    if (search) {
+      conditions.push(`sc.name ILIKE $${idx}`);
+      params.push(`%${search}%`);
+      idx++;
+    }
+    if (type) {
+      conditions.push(`sc.capability_type = $${idx}`);
+      params.push(type);
+      idx++;
+    }
+
+    const where = conditions.length > 0 ? "WHERE " + conditions.join(" AND ") : "";
+
+    const { rows } = await pool.query(
+      `SELECT sc.capability_type, sc.name, sc.description,
+              COUNT(DISTINCT sc.server_id)::int AS server_count
+       FROM server_capabilities sc
+       ${where}
+       GROUP BY sc.capability_type, sc.name, sc.description
+       ORDER BY server_count DESC, sc.name ASC
+       LIMIT $${idx}`,
+      [...params, limit]
+    );
+
+    return c.json({ ok: true, capabilities: rows.map(camelRow) });
+  } catch (err: any) {
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
 // ── GET /api/servers — list with pagination, search, filters ──
 app.get("/api/servers", async (c) => {
   try {
@@ -95,62 +136,71 @@ app.get("/api/servers", async (c) => {
     const search = c.req.query("search") || null;
     const status = c.req.query("status") || null;
     const transport = c.req.query("transport_type") || null;
+    const capability = c.req.query("capability") || null;
     const scoreMin = c.req.query("score_min") ? Number(c.req.query("score_min")) : null;
     const scoreMax = c.req.query("score_max") ? Number(c.req.query("score_max")) : null;
     const sort = c.req.query("sort") || "trust_score";
     const order = (c.req.query("order") || "desc").toLowerCase() === "asc" ? "ASC" : "DESC";
 
     const allowedSorts: Record<string, string> = {
-      trust_score: "trust_score",
-      name: "registry_name",
-      uptime: "uptime_24h",
-      latency: "latency_p50",
-      status: "current_status",
+      trust_score: "s.trust_score",
+      name: "s.registry_name",
+      uptime: "s.uptime_24h",
+      latency: "s.latency_p50",
+      status: "s.current_status",
     };
-    const sortCol = allowedSorts[sort] || "trust_score";
+    const sortCol = allowedSorts[sort] || "s.trust_score";
 
     const conditions: string[] = [];
     const params: any[] = [];
     let idx = 1;
+    let joinCapabilities = false;
 
     if (search) {
-      conditions.push(`(registry_name ILIKE $${idx} OR title ILIKE $${idx} OR description ILIKE $${idx})`);
+      conditions.push(`(s.registry_name ILIKE $${idx} OR s.title ILIKE $${idx} OR s.description ILIKE $${idx})`);
       params.push(`%${search}%`);
       idx++;
     }
     if (status === "remote") {
-      conditions.push(`current_status NOT IN ('local', 'unknown') AND current_status IS NOT NULL`);
+      conditions.push(`s.current_status NOT IN ('local', 'unknown') AND s.current_status IS NOT NULL`);
     } else if (status) {
-      conditions.push(`current_status = $${idx}`);
+      conditions.push(`s.current_status = $${idx}`);
       params.push(status);
       idx++;
     }
     if (transport) {
-      conditions.push(`transport_type = $${idx}`);
+      conditions.push(`s.transport_type = $${idx}`);
       params.push(transport);
       idx++;
     }
+    if (capability) {
+      joinCapabilities = true;
+      conditions.push(`sc.name ILIKE $${idx}`);
+      params.push(`%${capability}%`);
+      idx++;
+    }
     if (scoreMin != null) {
-      conditions.push(`trust_score >= $${idx}`);
+      conditions.push(`s.trust_score >= $${idx}`);
       params.push(scoreMin);
       idx++;
     }
     if (scoreMax != null) {
-      conditions.push(`trust_score <= $${idx}`);
+      conditions.push(`s.trust_score <= $${idx}`);
       params.push(scoreMax);
       idx++;
     }
 
     const where = conditions.length > 0 ? "WHERE " + conditions.join(" AND ") : "";
+    const capJoin = joinCapabilities ? "JOIN server_capabilities sc ON sc.server_id = s.id" : "";
 
-    const countQuery = `SELECT COUNT(*)::int AS total FROM servers ${where}`;
+    const countQuery = `SELECT COUNT(DISTINCT s.id)::int AS total FROM servers s ${capJoin} ${where}`;
     const { rows: [{ total }] } = await pool.query(countQuery, params);
 
     const dataQuery = `
-      SELECT id, registry_name, title, description, transport_type,
-             current_status, trust_score, latency_p50, latency_p95,
-             uptime_24h, uptime_7d, uptime_30d
-      FROM servers ${where}
+      SELECT DISTINCT s.id, s.registry_name, s.title, s.description, s.transport_type,
+             s.current_status, s.trust_score, s.latency_p50, s.latency_p95,
+             s.uptime_24h, s.uptime_7d, s.uptime_30d
+      FROM servers s ${capJoin} ${where}
       ORDER BY ${sortCol} ${order} NULLS LAST
       LIMIT $${idx} OFFSET $${idx + 1}
     `;
@@ -242,8 +292,14 @@ app.get("/api/servers/*", async (c) => {
       return c.json({ ok: true, total, limit, offset, checks: checks.map(camelRow) });
     }
 
-    // detail
-    return c.json({ ok: true, server: camelRow(srv[0]) });
+    // detail — include capabilities
+    const { rows: capabilities } = await pool.query(
+      "SELECT capability_type, name, description FROM server_capabilities WHERE server_id = $1 ORDER BY capability_type, name",
+      [srv[0].id]
+    );
+    const serverData = camelRow(srv[0]);
+    serverData.capabilities = capabilities.map(camelRow);
+    return c.json({ ok: true, server: serverData });
   } catch (err: any) {
     return c.json({ ok: false, error: err.message }, 500);
   }

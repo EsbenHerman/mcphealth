@@ -143,10 +143,45 @@ export async function checkAndRecord(serverId: string): Promise<CheckResult> {
          VALUES (gen_random_uuid(), $1, now(), $2, $3)`,
         [serverId, JSON.stringify(result.tools_json), result.tools_hash]
       );
+      // Update server_capabilities
+      await syncCapabilities(serverId, result.tools_json, null);
     }
   }
 
   return result;
+}
+
+async function syncCapabilities(serverId: string, tools: any[] | null, resources: any[] | null) {
+  try {
+    // Upsert tools
+    if (tools && tools.length > 0) {
+      for (const tool of tools) {
+        if (!tool.name) continue;
+        await pool.query(
+          `INSERT INTO server_capabilities (server_id, capability_type, name, description, updated_at)
+           VALUES ($1, 'tool', $2, $3, now())
+           ON CONFLICT (server_id, capability_type, name) DO UPDATE
+           SET description = EXCLUDED.description, updated_at = now()`,
+          [serverId, tool.name, tool.description || null]
+        );
+      }
+    }
+    // Upsert resources
+    if (resources && resources.length > 0) {
+      for (const res of resources) {
+        if (!res.name) continue;
+        await pool.query(
+          `INSERT INTO server_capabilities (server_id, capability_type, name, description, updated_at)
+           VALUES ($1, 'resource', $2, $3, now())
+           ON CONFLICT (server_id, capability_type, name) DO UPDATE
+           SET description = EXCLUDED.description, updated_at = now()`,
+          [serverId, res.name, res.description || null]
+        );
+      }
+    }
+  } catch (err) {
+    console.error(`[syncCapabilities] error for server ${serverId}:`, err);
+  }
 }
 
 export async function checkAllRemoteServers(): Promise<{ checked: number; up: number; down: number }> {
