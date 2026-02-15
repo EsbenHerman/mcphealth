@@ -305,6 +305,54 @@ app.get("/api/servers/*", async (c) => {
   }
 });
 
+// ── POST /api/admin/run-job — manually trigger jobs ──────────
+const jobRateLimit = new Map<string, number>();
+const RATE_LIMIT_MS = 5 * 60 * 1000; // 5 minutes
+
+app.post("/api/admin/run-job", async (c) => {
+  const adminSecret = process.env.ADMIN_SECRET;
+  const auth = c.req.header("Authorization");
+  if (!adminSecret || auth !== `Bearer ${adminSecret}`) {
+    return c.json({ ok: false, error: "Unauthorized" }, 401);
+  }
+
+  const body = await c.req.json().catch(() => ({}));
+  const job = body.job as string;
+  const validJobs = ["compliance-check-all", "health-check-all", "registry-sync", "trust-score-all"];
+  if (!validJobs.includes(job)) {
+    return c.json({ ok: false, error: `Invalid job. Valid: ${validJobs.join(", ")}` }, 400);
+  }
+
+  const lastRun = jobRateLimit.get(job) || 0;
+  if (Date.now() - lastRun < RATE_LIMIT_MS) {
+    const retryAfter = Math.ceil((RATE_LIMIT_MS - (Date.now() - lastRun)) / 1000);
+    return c.json({ ok: false, error: "Rate limited", retryAfterSeconds: retryAfter }, 429);
+  }
+
+  jobRateLimit.set(job, Date.now());
+
+  try {
+    let result: any;
+    switch (job) {
+      case "compliance-check-all":
+        result = await complianceCheckAll();
+        break;
+      case "health-check-all":
+        result = await checkAllRemoteServers();
+        break;
+      case "registry-sync":
+        result = { serverssynced: await syncRegistry() };
+        break;
+      case "trust-score-all":
+        result = await scoreAllServers();
+        break;
+    }
+    return c.json({ ok: true, job, result });
+  } catch (err: any) {
+    return c.json({ ok: false, job, error: err.message }, 500);
+  }
+});
+
 // Manual score-all endpoint
 app.post("/api/scores/calculate", async (c) => {
   try {
