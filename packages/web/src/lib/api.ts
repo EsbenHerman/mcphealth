@@ -79,6 +79,23 @@ export function getServerScore(name: string) {
   return apiFetch<ScoreBreakdown>(`/api/servers/${encodeURIComponent(name)}/score`);
 }
 
+export interface ScoreHistoryPoint {
+  scoredAt: string;
+  totalScore: number;
+  availabilityScore: number | null;
+  latencyScore: number | null;
+  stabilityScore: number | null;
+  complianceScore: number | null;
+  metadataScore: number | null;
+  freshnessScore: number | null;
+}
+
+export function getScoreHistory(name: string, days = 30) {
+  return apiFetch<{ ok: boolean; history: ScoreHistoryPoint[] }>(
+    `/api/servers/${encodeURIComponent(name)}/score-history?days=${days}`
+  );
+}
+
 export function getStats() {
   return apiFetch<StatsResponse>("/api/stats");
 }

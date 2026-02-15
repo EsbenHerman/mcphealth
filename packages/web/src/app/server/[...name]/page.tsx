@@ -1,7 +1,8 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { getServer, getServerScore, getServerChecks, type ScoreBreakdown } from "@/lib/api";
+import { getServer, getServerScore, getServerChecks, getScoreHistory, type ScoreBreakdown, type ScoreHistoryPoint } from "@/lib/api";
 import { ScoreBadge } from "@/components/ScoreBadge";
+import { ScoreChart } from "@/components/ScoreChart";
 import { StatusDot } from "@/components/StatusDot";
 
 export const dynamic = "force-dynamic";
@@ -92,13 +93,15 @@ export default async function ServerDetailPage({ params }: { params: Promise<{ n
   let server: any = null;
   let score: ScoreBreakdown | null = null;
   let checks: any[] = [];
+  let scoreHistory: ScoreHistoryPoint[] = [];
   let error = false;
 
   try {
-    [server, score, { checks }] = await Promise.all([
+    [server, score, { checks }, { history: scoreHistory }] = await Promise.all([
       getServer(serverName),
       getServerScore(serverName).catch(() => null),
       getServerChecks(serverName, { limit: "48" }).catch(() => ({ checks: [] })),
+      getScoreHistory(serverName, 30).catch(() => ({ history: [] })),
     ]) as any;
   } catch {
     error = true;
@@ -205,6 +208,12 @@ export default async function ServerDetailPage({ params }: { params: Promise<{ n
           </div>
         </section>
       </div>
+
+      {/* Trust Score Trend */}
+      <section className="rounded-xl border border-gray-800 bg-gray-900/50 p-6 space-y-4">
+        <h2 className="text-lg font-semibold">Trust Score Trend (30 days)</h2>
+        <ScoreChart history={scoreHistory} />
+      </section>
 
       {/* Recent Health Checks */}
       <section className="space-y-4">

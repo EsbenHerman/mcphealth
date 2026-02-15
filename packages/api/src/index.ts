@@ -170,13 +170,16 @@ app.get("/api/servers/*", async (c) => {
 
   // Detect suffix
   let name: string;
-  let action: "detail" | "score" | "checks";
+  let action: "detail" | "score" | "checks" | "score-history";
   if (fullPath.endsWith("/score")) {
     name = fullPath.slice(0, -"/score".length);
     action = "score";
   } else if (fullPath.endsWith("/checks")) {
     name = fullPath.slice(0, -"/checks".length);
     action = "checks";
+  } else if (fullPath.endsWith("/score-history")) {
+    name = fullPath.slice(0, -"/score-history".length);
+    action = "score-history" as any;
   } else {
     name = fullPath;
     action = "detail";
@@ -188,6 +191,23 @@ app.get("/api/servers/*", async (c) => {
   if (!name) return c.json({ ok: false, error: "Server name required" }, 400);
 
   try {
+    if (action === "score-history") {
+      const days = Math.min(Math.max(parseInt(c.req.query("days") || "30"), 1), 365);
+      const { rows: srv } = await pool.query(
+        "SELECT id FROM servers WHERE registry_name = $1", [name]
+      );
+      if (!srv[0]) return c.json({ ok: false, error: "Server not found" }, 404);
+      const { rows } = await pool.query(
+        `SELECT scored_at, total_score, availability_score, latency_score,
+                stability_score, compliance_score, metadata_score, freshness_score
+         FROM score_history
+         WHERE server_id = $1 AND scored_at >= NOW() - make_interval(days => $2)
+         ORDER BY scored_at ASC`,
+        [srv[0].id, days]
+      );
+      return c.json({ ok: true, history: rows.map(camelRow) });
+    }
+
     if (action === "score") {
       const breakdown = await getScoreBreakdown(name);
       if (!breakdown) return c.json({ ok: false, error: "Server not found" }, 404);
