@@ -160,6 +160,20 @@ export default async function ServerDetailPage({ params }: { params: Promise<{ n
         </div>
       </section>
 
+      {/* Local-only notice */}
+      {(server.currentStatus === "local" || server.currentStatus === "unknown") && (
+        <section className="rounded-xl border border-blue-500/20 bg-blue-500/5 p-5 flex gap-3 items-start">
+          <span className="text-blue-400 text-lg mt-0.5">ℹ</span>
+          <div className="space-y-1">
+            <p className="text-sm font-medium text-blue-300">This is a local-only server</p>
+            <p className="text-sm text-gray-400">
+              This server uses <strong className="text-gray-300">stdio</strong> transport, meaning it runs locally on your machine rather than over the network. 
+              MCPHealth can only perform health checks on remote servers (HTTP/SSE). Local servers don&apos;t have uptime, latency, or availability data — but that&apos;s expected and doesn&apos;t indicate a problem.
+            </p>
+          </div>
+        </section>
+      )}
+
       {/* Two-column: Score breakdown + Status history */}
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Trust Score Breakdown */}

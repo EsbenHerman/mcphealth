@@ -36,11 +36,11 @@ export function ServerFilters() {
         className={inputCls}
       >
         <option value="">All statuses</option>
+        <option value="remote">Remote only (with health data)</option>
         <option value="up">Up</option>
         <option value="down">Down</option>
         <option value="degraded">Degraded</option>
-        <option value="unknown">Unknown</option>
-        <option value="local">Local (stdio)</option>
+        <option value="local">Local only (stdio)</option>
       </select>
       <select
         defaultValue={searchParams.get("transport_type") ?? ""}

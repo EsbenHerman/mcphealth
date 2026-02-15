@@ -108,7 +108,9 @@ app.get("/api/servers", async (c) => {
       params.push(`%${search}%`);
       idx++;
     }
-    if (status) {
+    if (status === "remote") {
+      conditions.push(`current_status NOT IN ('local', 'unknown') AND current_status IS NOT NULL`);
+    } else if (status) {
       conditions.push(`current_status = $${idx}`);
       params.push(status);
       idx++;
