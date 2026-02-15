@@ -36,8 +36,18 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
     error = true;
   }
 
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "WebApplication",
+    name: "MCPHealth",
+    url: "https://mcphealth.dev",
+    description: "Real-time health monitoring, uptime tracking, and trust scores for MCP servers.",
+    applicationCategory: "DeveloperApplication",
+  };
+
   return (
     <div className="space-y-8">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       {/* Landing page */}
       {stats && <Landing totalServers={stats.totalServers} avgScore={stats.avgTrustScore} />}
 

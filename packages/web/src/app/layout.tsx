@@ -54,6 +54,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             </Link>
             <nav className="flex items-center gap-6 text-sm text-gray-400">
               <Link href="/" className="hover:text-gray-100 transition-colors">Dashboard</Link>
+              <a href="https://github.com/EsbenHerman/mcphealth" target="_blank" rel="noopener" className="hover:text-gray-100 transition-colors">GitHub</a>
             </nav>
           </div>
         </header>

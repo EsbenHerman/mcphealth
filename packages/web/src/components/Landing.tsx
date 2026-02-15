@@ -87,7 +87,7 @@ function HowItWorks() {
 
 /* ── Badge CTA ────────────────────────────────────────────────────── */
 function BadgeCTA() {
-  const exampleName = "composio";
+  const exampleName = "ai.specproof/specproof-mcp";
   const badgeUrl = `https://api.mcphealth.dev/api/badge/${exampleName}`;
   const markdownSnippet = `[![MCPHealth](https://api.mcphealth.dev/api/badge/YOUR-SERVER)](https://mcphealth.dev/server/YOUR-SERVER)`;
   const [copied, setCopied] = useState(false);
@@ -129,7 +129,7 @@ function DeveloperCTAs() {
           <h3 className="font-semibold text-gray-100">REST API</h3>
         </div>
         <p className="text-sm text-gray-400">Query server health, scores, and check history programmatically.</p>
-        <code className="block mt-2 text-xs text-green-400/80 font-mono">GET api.mcphealth.dev/api/servers</code>
+        <code className="block mt-2 text-xs text-green-400/80 font-mono">GET https://api.mcphealth.dev/api/servers</code>
       </div>
       <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-6 space-y-2">
         <div className="flex items-center gap-2">
@@ -137,7 +137,7 @@ function DeveloperCTAs() {
           <h3 className="font-semibold text-gray-100">RSS Feed</h3>
         </div>
         <p className="text-sm text-gray-400">Subscribe to status changes and new server discoveries in your feed reader.</p>
-        <code className="block mt-2 text-xs text-green-400/80 font-mono">api.mcphealth.dev/api/rss</code>
+        <code className="block mt-2 text-xs text-green-400/80 font-mono">https://api.mcphealth.dev/api/feed</code>
       </div>
     </section>
   );
