@@ -4,7 +4,7 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import PgBoss from "pg-boss";
 import { syncRegistry } from "./registry-sync.js";
-import { checkAndRecord, checkAllRemoteServers } from "./health-checker.js";
+import { checkAndRecord, checkAllRemoteServers, complianceCheckAll } from "./health-checker.js";
 import { getScoreBreakdown, scoreAllServers } from "./trust-score.js";
 import pool from "./db.js";
 
@@ -470,6 +470,21 @@ if (databaseUrl) {
       console.log("[pg-boss] calculating trust scores...");
       const scoreStats = await scoreAllServers();
       console.log(`[pg-boss] trust scores done — ${JSON.stringify(scoreStats)}`);
+    });
+
+    // Protocol compliance check — every 6 hours
+    const COMPLIANCE_JOB = "compliance-check-all";
+    await boss.createQueue(COMPLIANCE_JOB).catch(() => {});
+    await boss.schedule(COMPLIANCE_JOB, "0 */6 * * *");
+    console.log("[pg-boss] scheduled compliance-check-all every 6h");
+
+    await boss.work(COMPLIANCE_JOB, async () => {
+      console.log("[pg-boss] running compliance-check-all...");
+      const stats = await complianceCheckAll();
+      console.log(`[pg-boss] compliance done — ${JSON.stringify(stats)}`);
+      // Rescore after compliance
+      const scoreStats = await scoreAllServers();
+      console.log(`[pg-boss] trust scores updated — ${JSON.stringify(scoreStats)}`);
     });
 
     // Trust score recalculation — every 30 minutes

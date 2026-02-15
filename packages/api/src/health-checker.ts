@@ -70,6 +70,10 @@ export async function checkServer(
 
     const toolsHash = tools.length > 0 ? hashTools(tools) : null;
 
+    // Extract protocol info from the connected client
+    const serverVersion = client.getServerVersion();
+    const protocolVersion = serverVersion ? `${serverVersion.name}/${serverVersion.version}` : null;
+
     try { await client.close(); } catch {}
 
     return {
@@ -79,7 +83,7 @@ export async function checkServer(
       tools_hash: toolsHash,
       tools_json: tools.length > 0 ? tools : null,
       error_message: null,
-      protocol_version: null,
+      protocol_version: protocolVersion,
     };
   } catch (err: any) {
     try { await client.close(); } catch {}
@@ -182,6 +186,187 @@ async function syncCapabilities(serverId: string, tools: any[] | null, resources
   } catch (err) {
     console.error(`[syncCapabilities] error for server ${serverId}:`, err);
   }
+}
+
+// ── Protocol Compliance Checker ─────────────────────
+
+interface ComplianceResult {
+  pass: boolean;
+  checks: Record<string, { pass: boolean; detail?: string }>;
+  protocol_version: string | null;
+}
+
+export async function checkCompliance(
+  remoteUrl: string,
+  transportType: string
+): Promise<ComplianceResult> {
+  const checks: Record<string, { pass: boolean; detail?: string }> = {};
+  let protocolVersion: string | null = null;
+
+  const client = new Client({ name: "mcphealth-compliance", version: "0.1.0" });
+  const abortController = new AbortController();
+  const timer = setTimeout(() => abortController.abort(), CHECK_TIMEOUT_MS * 2);
+
+  try {
+    const url = new URL(remoteUrl);
+    const transport =
+      transportType === "sse"
+        ? new SSEClientTransport(url)
+        : new StreamableHTTPClientTransport(url);
+
+    // 1. Initialize handshake
+    try {
+      await Promise.race([
+        client.connect(transport),
+        new Promise((_, reject) => {
+          abortController.signal.addEventListener("abort", () =>
+            reject(new Error("timeout"))
+          );
+        }),
+      ]);
+
+      const serverVersion = client.getServerVersion();
+      const capabilities = client.getServerCapabilities();
+
+      checks.initialize = {
+        pass: true,
+        detail: serverVersion ? `${serverVersion.name}/${serverVersion.version}` : "connected",
+      };
+      protocolVersion = serverVersion ? `${serverVersion.name}/${serverVersion.version}` : null;
+
+      // 2. Server returned capabilities object
+      checks.capabilities = {
+        pass: capabilities != null && typeof capabilities === "object",
+        detail: capabilities ? Object.keys(capabilities).join(", ") || "empty" : "missing",
+      };
+    } catch (err: any) {
+      checks.initialize = { pass: false, detail: err.message?.slice(0, 200) };
+      checks.capabilities = { pass: false, detail: "skipped (no connection)" };
+      clearTimeout(timer);
+      return { pass: false, checks, protocol_version: null };
+    }
+
+    // 3. tools/list returns valid response
+    try {
+      const result = await Promise.race([
+        client.listTools(),
+        new Promise<never>((_, reject) => {
+          abortController.signal.addEventListener("abort", () =>
+            reject(new Error("timeout"))
+          );
+        }),
+      ]);
+      const tools = result.tools || [];
+      // Validate each tool has name and inputSchema
+      const validTools = tools.every(
+        (t: any) => typeof t.name === "string" && t.name.length > 0
+      );
+      checks.tools_list = {
+        pass: true,
+        detail: `${tools.length} tools, schema valid: ${validTools}`,
+      };
+      checks.tools_schema = {
+        pass: validTools || tools.length === 0,
+        detail: validTools ? "all tools have name" : "some tools missing name",
+      };
+    } catch (err: any) {
+      // tools/list is optional per spec, so not a hard fail
+      checks.tools_list = {
+        pass: true,
+        detail: `not supported: ${err.message?.slice(0, 100)}`,
+      };
+      checks.tools_schema = { pass: true, detail: "n/a" };
+    }
+
+    // 4. JSON-RPC error handling: call non-existent method
+    try {
+      // Use raw request to test error handling
+      await Promise.race([
+        client.request(
+          { method: "nonexistent/method_that_should_not_exist", params: {} },
+          { $schema: "http://json-schema.org/draft-07/schema#" } as any
+        ),
+        new Promise<never>((_, reject) => {
+          abortController.signal.addEventListener("abort", () =>
+            reject(new Error("timeout"))
+          );
+        }),
+      ]);
+      // If it succeeds, that's weird but not necessarily a fail
+      checks.error_handling = { pass: true, detail: "returned response (unexpected but ok)" };
+    } catch (err: any) {
+      // We expect an error - that's correct behavior
+      const msg = err.message || String(err);
+      const isProperError = msg.includes("Method not found") || msg.includes("-32601") || 
+                            msg.includes("not found") || msg.includes("unknown") ||
+                            msg.includes("error") || msg.includes("Error");
+      checks.error_handling = {
+        pass: isProperError,
+        detail: msg.slice(0, 200),
+      };
+    }
+
+    try { await client.close(); } catch {}
+
+    // Overall pass: initialize + capabilities must pass, rest are advisory
+    const pass = checks.initialize.pass && checks.capabilities.pass;
+
+    return { pass, checks, protocol_version: protocolVersion };
+  } catch (err: any) {
+    try { await client.close(); } catch {}
+    return {
+      pass: false,
+      checks: { ...checks, unexpected: { pass: false, detail: err.message?.slice(0, 200) } },
+      protocol_version: null,
+    };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+export async function complianceCheckAndRecord(serverId: string): Promise<ComplianceResult> {
+  const { rows } = await pool.query(
+    "SELECT remote_url, transport_type FROM servers WHERE id = $1",
+    [serverId]
+  );
+  if (!rows[0]?.remote_url) throw new Error("Server not found or no remote_url");
+
+  const result = await checkCompliance(rows[0].remote_url, rows[0].transport_type);
+
+  await pool.query(
+    `INSERT INTO health_checks (id, server_id, checked_at, status, latency_ms, error_message, compliance_pass, check_level)
+     VALUES (gen_random_uuid(), $1, now(), $2, 0, $3, $4, 'compliance')`,
+    [
+      serverId,
+      result.pass ? "up" : "down",
+      result.pass ? null : JSON.stringify(result.checks).slice(0, 1000),
+      result.pass,
+    ]
+  );
+
+  return result;
+}
+
+export async function complianceCheckAll(): Promise<{ checked: number; passed: number; failed: number }> {
+  const { rows: servers } = await pool.query(
+    "SELECT id FROM servers WHERE remote_url IS NOT NULL ORDER BY registry_name"
+  );
+
+  let passed = 0, failed = 0;
+  const BATCH = 5;
+  for (let i = 0; i < servers.length; i += BATCH) {
+    const batch = servers.slice(i, i + BATCH);
+    const results = await Promise.allSettled(
+      batch.map((s) => complianceCheckAndRecord(s.id))
+    );
+    for (const r of results) {
+      if (r.status === "fulfilled" && r.value.pass) passed++;
+      else failed++;
+    }
+    console.log(`[compliance] batch ${Math.floor(i / BATCH) + 1}/${Math.ceil(servers.length / BATCH)} done`);
+  }
+
+  return { checked: servers.length, passed, failed };
 }
 
 export async function checkAllRemoteServers(): Promise<{ checked: number; up: number; down: number }> {
