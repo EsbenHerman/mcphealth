@@ -1,5 +1,5 @@
 // Use server-side env var at runtime (not baked in at build time like NEXT_PUBLIC_*)
-const API_URL = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+const API_URL = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || "https://api.mcphealth.dev";
 
 export async function apiFetch<T>(path: string, opts?: RequestInit): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, {

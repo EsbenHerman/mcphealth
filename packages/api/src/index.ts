@@ -294,7 +294,7 @@ app.get("/api/feed", async (c) => {
       LIMIT 100
     `);
 
-    const baseUrl = process.env.PUBLIC_URL || "https://mcphealth.io";
+    const baseUrl = process.env.PUBLIC_URL || "https://mcphealth.dev";
     const now = new Date().toUTCString();
 
     const items = rows.map((r: any) => {
