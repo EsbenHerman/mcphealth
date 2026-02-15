@@ -337,12 +337,18 @@ app.post("/api/admin/run-job", async (c) => {
   try {
     let result: any;
     switch (job) {
-      case "compliance-check-all":
-        result = await complianceCheckAll();
+      case "compliance-check-all": {
+        const complianceResult = await complianceCheckAll();
+        const rescoreResult = await scoreAllServers();
+        result = { ...complianceResult, rescore: rescoreResult };
         break;
-      case "health-check-all":
-        result = await checkAllRemoteServers();
+      }
+      case "health-check-all": {
+        const healthResult = await checkAllRemoteServers();
+        const rescoreResult = await scoreAllServers();
+        result = { ...healthResult, rescore: rescoreResult };
         break;
+      }
       case "registry-sync":
         result = { serverssynced: await syncRegistry() };
         break;
