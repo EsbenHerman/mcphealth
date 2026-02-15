@@ -6,6 +6,7 @@ import PgBoss from "pg-boss";
 import { syncRegistry } from "./registry-sync.js";
 import { checkAndRecord, checkAllRemoteServers, complianceCheckAll } from "./health-checker.js";
 import { getScoreBreakdown, scoreAllServers } from "./trust-score.js";
+import { rateLimiter } from "./rate-limit.js";
 import pool from "./db.js";
 
 // Convert snake_case DB rows to camelCase for the frontend
@@ -31,6 +32,8 @@ app.use(
     ],
   })
 );
+
+app.use("/*", rateLimiter());
 
 app.get("/health", (c) =>
   c.json({ status: "ok", timestamp: new Date().toISOString() })
