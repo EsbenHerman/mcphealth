@@ -48,7 +48,7 @@ function generateSmitheryId(server: SmitheryServer): string {
 export async function syncSmitheryRegistry(): Promise<number> {
   let page = 1;
   let totalUpserted = 0;
-  const pageSize = 100;
+  const pageSize = 50;
   let hasMorePages = true;
 
   console.log("[smithery-sync] Starting full sync...");
