@@ -21,8 +21,10 @@
   --color-red-500: #ef4444;
 }
 
+html,
 body {
   background: var(--color-gray-950);
+  overflow-x: hidden;
 }
 
 /* Clean look: no border radius */
