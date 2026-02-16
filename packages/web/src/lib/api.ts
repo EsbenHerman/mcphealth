@@ -26,6 +26,8 @@ export interface ServerRow {
   trustScore: number | null;
   latencyP50: number | null;
   uptime24h: number | null;
+  registry_source: string | null;
+  external_use_count: number | null;
 }
 
 export interface StatsResponse {

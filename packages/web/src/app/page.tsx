@@ -113,11 +113,11 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
                     </td>
                     <td className="px-4 py-3 hidden lg:table-cell">
                       <span className={`rounded-md px-2 py-0.5 text-xs font-medium ${
-                        s.registrySource === 'official' 
+                        s.registry_source === 'official' 
                           ? 'bg-green-500/10 text-green-400 border border-green-500/20' 
                           : 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
                       }`}>
-                        {s.registrySource === 'official' ? 'Official' : 'Smithery'}
+                        {s.registry_source === 'official' ? 'Official' : 'Smithery'}
                       </span>
                     </td>
                     <td className="px-4 py-3">
