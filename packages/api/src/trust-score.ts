@@ -1,12 +1,13 @@
 import pool from "./db.js";
 // Import constants directly — workspace linking
 const SCORE_WEIGHTS = {
-  availability: 0.35,
+  availability: 0.30,
   latency: 0.15,
-  schemaStability: 0.20,
-  protocolCompliance: 0.15,
+  schemaStability: 0.18,
+  protocolCompliance: 0.12,
   metadataQuality: 0.10,
   freshness: 0.05,
+  popularity: 0.10, // external_use_count from Smithery
 } as const;
 
 const LOCAL_ONLY_MAX_SCORE = 60;
@@ -83,6 +84,20 @@ function scoreFreshness(registryUpdatedAt: Date | null): number {
   if (days <= 90) return 80;
   if (days <= 180) return 50;
   return 0;
+}
+
+/** Popularity: external use count from Smithery → 0-100 */
+function scorePopularity(externalUseCount: number | null): number {
+  if (externalUseCount == null) return 50; // neutral score for unknown
+  if (externalUseCount >= 1000) return 100;
+  if (externalUseCount >= 500) return 90;
+  if (externalUseCount >= 100) return 80;
+  if (externalUseCount >= 50) return 70;
+  if (externalUseCount >= 25) return 60;
+  if (externalUseCount >= 10) return 50;
+  if (externalUseCount >= 5) return 40;
+  if (externalUseCount >= 1) return 30;
+  return 20; // 0 uses
 }
 
 // ── Uptime calculation helpers ──────────────────────
@@ -170,6 +185,7 @@ export interface ScoreBreakdown {
     protocolCompliance: { score: number; weight: number; weighted: number; raw: boolean | null };
     metadataQuality: { score: number; weight: number; weighted: number };
     freshness: { score: number; weight: number; weighted: number; raw: Date | null };
+    popularity: { score: number; weight: number; weighted: number; raw: number | null };
   };
   stats: {
     uptime24h: number | null;
@@ -205,12 +221,13 @@ export async function calculateScore(serverId: string): Promise<ScoreBreakdown> 
   const comp = scoreCompliance(stats.compliancePass);
   const meta = scoreMetadata(server);
   const fresh = scoreFreshness(server.registry_updated_at ? new Date(server.registry_updated_at) : null);
+  const pop = scorePopularity(server.external_use_count);
 
   let totalScore: number;
 
   if (isLocalOnly) {
-    // Local-only: only metadata + freshness, capped at 60
-    const localScore = (meta * 0.667 + fresh * 0.333);
+    // Local-only: only metadata + freshness + popularity, capped at 60
+    const localScore = (meta * 0.5 + fresh * 0.25 + pop * 0.25);
     totalScore = Math.min(Math.round(localScore * LOCAL_ONLY_MAX_SCORE / 100), LOCAL_ONLY_MAX_SCORE);
   } else {
     totalScore = Math.round(
@@ -219,7 +236,8 @@ export async function calculateScore(serverId: string): Promise<ScoreBreakdown> 
       stab * SCORE_WEIGHTS.schemaStability +
       comp * SCORE_WEIGHTS.protocolCompliance +
       meta * SCORE_WEIGHTS.metadataQuality +
-      fresh * SCORE_WEIGHTS.freshness
+      fresh * SCORE_WEIGHTS.freshness +
+      pop * SCORE_WEIGHTS.popularity
     );
   }
 
@@ -239,6 +257,7 @@ export async function calculateScore(serverId: string): Promise<ScoreBreakdown> 
       protocolCompliance: { score: comp, weight: SCORE_WEIGHTS.protocolCompliance, weighted: comp * SCORE_WEIGHTS.protocolCompliance, raw: stats.compliancePass },
       metadataQuality: { score: meta, weight: SCORE_WEIGHTS.metadataQuality, weighted: meta * SCORE_WEIGHTS.metadataQuality },
       freshness: { score: fresh, weight: SCORE_WEIGHTS.freshness, weighted: fresh * SCORE_WEIGHTS.freshness, raw: server.registry_updated_at },
+      popularity: { score: pop, weight: SCORE_WEIGHTS.popularity, weighted: pop * SCORE_WEIGHTS.popularity, raw: server.external_use_count },
     },
     stats: {
       uptime24h: stats.uptime24h,
@@ -278,8 +297,8 @@ export async function scoreAllServers(): Promise<{ scored: number; errors: numbe
 
         // Store in score_history
         await pool.query(
-          `INSERT INTO score_history (id, server_id, scored_at, total_score, availability_score, latency_score, stability_score, compliance_score, metadata_score, freshness_score)
-           VALUES (gen_random_uuid(), $1, now(), $2, $3, $4, $5, $6, $7, $8)`,
+          `INSERT INTO score_history (id, server_id, scored_at, total_score, availability_score, latency_score, stability_score, compliance_score, metadata_score, freshness_score, popularity_score)
+           VALUES (gen_random_uuid(), $1, now(), $2, $3, $4, $5, $6, $7, $8, $9)`,
           [
             s.id,
             breakdown.totalScore,
@@ -289,6 +308,7 @@ export async function scoreAllServers(): Promise<{ scored: number; errors: numbe
             breakdown.factors.protocolCompliance.weighted,
             breakdown.factors.metadataQuality.weighted,
             breakdown.factors.freshness.weighted,
+            breakdown.factors.popularity.weighted,
           ]
         );
 

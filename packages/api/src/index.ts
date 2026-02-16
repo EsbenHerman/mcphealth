@@ -4,6 +4,7 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import PgBoss from "pg-boss";
 import { syncRegistry } from "./registry-sync.js";
+import { syncSmitheryRegistry } from "./registry-sync-smithery.js";
 import { checkAndRecord, checkAllRemoteServers, complianceCheckAll } from "./health-checker.js";
 import { getScoreBreakdown, scoreAllServers } from "./trust-score.js";
 import { rateLimiter } from "./rate-limit.js";
@@ -139,6 +140,7 @@ app.get("/api/servers", async (c) => {
     const search = c.req.query("search") || null;
     const status = c.req.query("status") || null;
     const transport = c.req.query("transport_type") || null;
+    const registrySource = c.req.query("registry_source") || null;
     const capability = c.req.query("capability") || null;
     const scoreMin = c.req.query("score_min") ? Number(c.req.query("score_min")) : null;
     const scoreMax = c.req.query("score_max") ? Number(c.req.query("score_max")) : null;
@@ -174,6 +176,11 @@ app.get("/api/servers", async (c) => {
     if (transport) {
       conditions.push(`s.transport_type = $${idx}`);
       params.push(transport);
+      idx++;
+    }
+    if (registrySource) {
+      conditions.push(`s.registry_source = $${idx}`);
+      params.push(registrySource);
       idx++;
     }
     if (capability) {
@@ -252,7 +259,8 @@ app.get("/api/servers/*", async (c) => {
       if (!srv[0]) return c.json({ ok: false, error: "Server not found" }, 404);
       const { rows } = await pool.query(
         `SELECT scored_at, total_score, availability_score, latency_score,
-                stability_score, compliance_score, metadata_score, freshness_score
+                stability_score, compliance_score, metadata_score, freshness_score,
+                popularity_score
          FROM score_history
          WHERE server_id = $1 AND scored_at >= NOW() - make_interval(days => $2)
          ORDER BY scored_at ASC`,
@@ -321,7 +329,7 @@ app.post("/api/admin/run-job", async (c) => {
 
   const body = await c.req.json().catch(() => ({}));
   const job = body.job as string;
-  const validJobs = ["compliance-check-all", "health-check-all", "registry-sync", "trust-score-all"];
+  const validJobs = ["compliance-check-all", "health-check-all", "registry-sync", "registry-sync-smithery", "trust-score-all"];
   if (!validJobs.includes(job)) {
     return c.json({ ok: false, error: `Invalid job. Valid: ${validJobs.join(", ")}` }, 400);
   }
@@ -351,6 +359,9 @@ app.post("/api/admin/run-job", async (c) => {
       }
       case "registry-sync":
         result = { serverssynced: await syncRegistry() };
+        break;
+      case "registry-sync-smithery":
+        result = { serverssynced: await syncSmitheryRegistry() };
         break;
       case "trust-score-all":
         result = await scoreAllServers();
@@ -578,6 +589,7 @@ if (databaseUrl) {
   boss.start().then(async () => {
     // Create queues first (pg-boss v10 requires explicit queue creation)
     await boss.createQueue("registry-sync").catch(() => {});
+    await boss.createQueue("registry-sync-smithery").catch(() => {});
     await boss.createQueue("health-check-all").catch(() => {});
     await boss.createQueue("trust-score-all").catch(() => {});
     console.log("[pg-boss] started");
@@ -592,6 +604,18 @@ if (databaseUrl) {
       console.log("[pg-boss] running registry-sync job...");
       const count = await syncRegistry();
       console.log(`[pg-boss] registry-sync done — ${count} servers`);
+      await markLocalServers();
+    });
+
+    // Smithery sync job — every 6 hours
+    const SMITHERY_SYNC_JOB = "registry-sync-smithery";
+    await boss.schedule(SMITHERY_SYNC_JOB, "0 */6 * * *");
+    console.log("[pg-boss] scheduled registry-sync-smithery every 6h");
+
+    await boss.work(SMITHERY_SYNC_JOB, async () => {
+      console.log("[pg-boss] running registry-sync-smithery job...");
+      const count = await syncSmitheryRegistry();
+      console.log(`[pg-boss] registry-sync-smithery done — ${count} servers`);
       await markLocalServers();
     });
 
