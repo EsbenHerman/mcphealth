@@ -1,13 +1,14 @@
-import { getStats } from "@/lib/api";
+import { getStats, getRecentActivity } from "@/lib/api";
 import { Landing } from "@/components/Landing";
 
 export default async function Home() {
   let stats = null;
+  let recentActivity = null;
 
   try {
-    stats = await getStats();
+    [stats, recentActivity] = await Promise.all([getStats(), getRecentActivity()]);
   } catch {
-    // API unavailable
+    try { stats = await getStats(); } catch { /* API unavailable */ }
   }
 
   const jsonLd = {
@@ -22,7 +23,7 @@ export default async function Home() {
   return (
     <div className="space-y-8">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
-      {stats && <Landing totalServers={stats.totalServers} avgScore={stats.avgTrustScore} />}
+      {stats && <Landing totalServers={stats.totalServers} avgScore={stats.avgTrustScore} recentActivity={recentActivity} />}
     </div>
   );
 }

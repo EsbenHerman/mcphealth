@@ -91,6 +91,44 @@ app.get("/api/stats", async (c) => {
   }
 });
 
+// ── GET /api/recent-activity — recent server events for social proof ──
+app.get("/api/recent-activity", async (c) => {
+  try {
+    const limit = Math.min(Math.max(parseInt(c.req.query("limit") || "10"), 1), 30);
+    const { rows: events } = await pool.query(`
+      SELECT
+        e.event_type,
+        e.old_value,
+        e.new_value,
+        e.created_at,
+        s.registry_name,
+        s.title,
+        s.trust_score,
+        s.current_status,
+        s.registry_source
+      FROM server_events e
+      JOIN servers s ON s.id = e.server_id
+      ORDER BY e.created_at DESC
+      LIMIT $1
+    `, [limit]);
+
+    const { rows: newest } = await pool.query(`
+      SELECT registry_name, title, trust_score, current_status, registry_source, created_at
+      FROM servers
+      ORDER BY created_at DESC
+      LIMIT 5
+    `);
+
+    return c.json({
+      ok: true,
+      events: events.map(camelRow),
+      newestServers: newest.map(camelRow),
+    });
+  } catch (err: any) {
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
 // ── GET /api/capabilities — list all known capabilities with server counts ──
 app.get("/api/capabilities", async (c) => {
   try {

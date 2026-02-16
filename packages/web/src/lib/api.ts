@@ -103,3 +103,34 @@ export function getScoreHistory(name: string, days = 30) {
 export function getStats() {
   return apiFetch<StatsResponse>("/api/stats");
 }
+
+export interface RecentEvent {
+  eventType: string;
+  oldValue: string | null;
+  newValue: string | null;
+  createdAt: string;
+  registryName: string;
+  title: string | null;
+  trustScore: number | null;
+  currentStatus: string;
+  registrySource: string | null;
+}
+
+export interface NewestServer {
+  registryName: string;
+  title: string | null;
+  trustScore: number | null;
+  currentStatus: string;
+  registrySource: string | null;
+  createdAt: string;
+}
+
+export interface RecentActivityResponse {
+  ok: boolean;
+  events: RecentEvent[];
+  newestServers: NewestServer[];
+}
+
+export function getRecentActivity() {
+  return apiFetch<RecentActivityResponse>("/api/recent-activity");
+}

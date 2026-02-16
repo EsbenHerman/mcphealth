@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import type { RecentActivityResponse } from "@/lib/api";
 
 /* ── Hero ─────────────────────────────────────────────────────────── */
 function Hero() {
@@ -183,12 +184,120 @@ function FAQ() {
   );
 }
 
+/* ── Recent Activity / Social Proof ───────────────────────────────── */
+function eventLabel(type: string, oldVal: string | null, newVal: string | null): string {
+  switch (type) {
+    case "status_change": return `Status: ${oldVal ?? "?"} → ${newVal ?? "?"}`;
+    case "score_change": return `Score: ${oldVal ?? "?"} → ${newVal ?? "?"}`;
+    case "server_added": return "Newly discovered";
+    case "compliance_change": return `Compliance: ${newVal === "pass" ? "✓ passed" : "✗ failed"}`;
+    default: return type.replace(/_/g, " ");
+  }
+}
+
+function eventIcon(type: string): string {
+  switch (type) {
+    case "status_change": return "🔄";
+    case "score_change": return "📊";
+    case "server_added": return "✨";
+    case "compliance_change": return "🛡️";
+    default: return "📋";
+  }
+}
+
+function timeAgo(dateStr: string): string {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  return `${days}d ago`;
+}
+
+function ScorePill({ score }: { score: number | null }) {
+  if (score === null) return <span className="text-xs text-gray-600">—</span>;
+  const color = score >= 70 ? "text-green-400" : score >= 40 ? "text-yellow-400" : "text-red-400";
+  return <span className={`text-xs font-bold ${color}`}>{Math.round(score)}</span>;
+}
+
+function RecentActivity({ data }: { data: RecentActivityResponse }) {
+  return (
+    <section className="space-y-8">
+      <div className="text-center">
+        <h2 className="text-2xl font-bold tracking-tight">Live activity</h2>
+        <p className="mt-2 text-gray-400 text-sm">Real-time events from monitored MCP servers</p>
+      </div>
+
+      <div className="grid gap-6 sm:grid-cols-2">
+        {/* Recent Events */}
+        <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-5 space-y-1">
+          <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-3">Recent events</h3>
+          <div className="space-y-2">
+            {data.events.slice(0, 8).map((ev, i) => (
+              <a
+                key={i}
+                href={`/server/${encodeURIComponent(ev.registryName)}`}
+                className="flex items-center gap-3 rounded-lg px-3 py-2 hover:bg-gray-800/60 transition-colors group"
+              >
+                <span className="text-sm shrink-0">{eventIcon(ev.eventType)}</span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm text-gray-200 truncate group-hover:text-white">
+                    {ev.title || ev.registryName}
+                  </p>
+                  <p className="text-xs text-gray-500">{eventLabel(ev.eventType, ev.oldValue, ev.newValue)}</p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <ScorePill score={ev.trustScore} />
+                  <span className="text-[10px] text-gray-600">{timeAgo(ev.createdAt)}</span>
+                </div>
+              </a>
+            ))}
+          </div>
+        </div>
+
+        {/* Newest Servers */}
+        <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-5 space-y-1">
+          <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-3">Newest servers</h3>
+          <div className="space-y-2">
+            {data.newestServers.map((s, i) => (
+              <a
+                key={i}
+                href={`/server/${encodeURIComponent(s.registryName)}`}
+                className="flex items-center gap-3 rounded-lg px-3 py-2 hover:bg-gray-800/60 transition-colors group"
+              >
+                <span className="text-sm shrink-0">✨</span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm text-gray-200 truncate group-hover:text-white">
+                    {s.title || s.registryName}
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    {s.registrySource === "smithery" ? "Smithery" : "Official registry"}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <ScorePill score={s.trustScore} />
+                  <span className="text-[10px] text-gray-600">{timeAgo(s.createdAt)}</span>
+                </div>
+              </a>
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 /* ── Composed Landing ─────────────────────────────────────────────── */
-export function Landing({ totalServers, avgScore }: { totalServers: number; avgScore: number | null }) {
+export function Landing({ totalServers, avgScore, recentActivity }: { totalServers: number; avgScore: number | null; recentActivity: RecentActivityResponse | null }) {
   return (
     <div className="space-y-16 pb-8">
       <Hero />
       <StatsStrip totalServers={totalServers} avgScore={avgScore} />
+      {recentActivity && (recentActivity.events.length > 0 || recentActivity.newestServers.length > 0) && (
+        <RecentActivity data={recentActivity} />
+      )}
       <HowItWorks />
       <BadgeCTA />
       <DeveloperCTAs />
