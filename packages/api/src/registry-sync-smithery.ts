@@ -45,34 +45,13 @@ function generateSmitheryId(server: SmitheryServer): string {
   return `smithery:${server.qualifiedName}`;
 }
 
-export async function syncSmitheryRegistry(): Promise<number> {
-  let page = 1;
-  let totalUpserted = 0;
-  const pageSize = 50;
-  let hasMorePages = true;
-
-  console.log("[smithery-sync] Starting full sync...");
-
-  while (hasMorePages) {
-    const url = new URL("/servers", SMITHERY_BASE);
-    url.searchParams.set("page", page.toString());
-    url.searchParams.set("pageSize", pageSize.toString());
-
-    try {
-      const res = await fetch(url.toString());
-      if (!res.ok) {
-        throw new Error(`Smithery API error: ${res.status} ${res.statusText}`);
-      }
-
-      const data: SmitheryResponse = await res.json();
-      const { servers, pagination } = data;
-
-      if (!servers || servers.length === 0) break;
-
-      for (const entry of servers) {
+async function upsertSmitheryServer(entry: SmitheryServer, seen: Set<string>): Promise<boolean> {
         const transportType = extractTransportFromSmithery(entry);
         const repoUrl = extractGitHubRepoFromQualifiedName(entry.qualifiedName);
         const smitheryId = generateSmitheryId(entry);
+
+        if (seen.has(smitheryId)) return false;
+        seen.add(smitheryId);
 
         // Check for existing server by GitHub repo URL or qualified name to avoid duplicates
         let existingServerId: string | null = null;
@@ -87,7 +66,6 @@ export async function syncSmitheryRegistry(): Promise<number> {
         }
 
         if (!existingServerId) {
-          // Also check by qualified name match (for npm packages without GitHub)
           const { rows: existingByName } = await pool.query(
             "SELECT id FROM servers WHERE registry_name = $1", [entry.qualifiedName]
           );
@@ -97,7 +75,6 @@ export async function syncSmitheryRegistry(): Promise<number> {
         }
 
         if (existingServerId) {
-          // Update existing server with Smithery data
           await pool.query(
             `UPDATE servers SET
               external_use_count = $2,
@@ -107,7 +84,6 @@ export async function syncSmitheryRegistry(): Promise<number> {
             [existingServerId, entry.useCount, smitheryId]
           );
         } else {
-          // Insert new server from Smithery
           const { rows: upsertRows } = await pool.query(
             `INSERT INTO servers (
               registry_name, title, description,
@@ -135,7 +111,7 @@ export async function syncSmitheryRegistry(): Promise<number> {
               entry.homepage || null,
               entry.iconUrl || null,
               transportType,
-              "smithery", // registry_source
+              "smithery",
               entry.useCount,
               smitheryId,
               entry.verified ? "verified" : "unverified",
@@ -143,7 +119,6 @@ export async function syncSmitheryRegistry(): Promise<number> {
             ]
           );
 
-          // Emit server_added event for new servers
           if (upsertRows[0]?.inserted) {
             await pool.query(
               "INSERT INTO server_events (server_id, event_type, new_value) VALUES ($1, 'server_added', $2)",
@@ -152,26 +127,59 @@ export async function syncSmitheryRegistry(): Promise<number> {
           }
         }
 
-        totalUpserted++;
-      }
+        return true;
+}
 
-      console.log(`[smithery-sync] Page ${page} done — ${servers.length} servers (total so far: ${totalUpserted})`);
+async function fetchSmitheryPage(query: string, page: number, pageSize: number): Promise<SmitheryResponse> {
+  const url = new URL("/servers", SMITHERY_BASE);
+  url.searchParams.set("page", page.toString());
+  url.searchParams.set("pageSize", pageSize.toString());
+  if (query) url.searchParams.set("q", query);
+  const res = await fetch(url.toString());
+  if (!res.ok) throw new Error(`Smithery API error: ${res.status} ${res.statusText}`);
+  return res.json() as Promise<SmitheryResponse>;
+}
 
-      // Check if we have more pages
-      hasMorePages = page < pagination.totalPages;
-      page++;
+export async function syncSmitheryRegistry(): Promise<number> {
+  let totalUpserted = 0;
+  const pageSize = 50;
+  const seen = new Set<string>();
 
-    } catch (error) {
-      console.error(`[smithery-sync] Error on page ${page}:`, error);
-      // Continue to next page on error, but log it
-      page++;
-      if (page > 100) { // Safety limit to avoid infinite loops
-        console.error("[smithery-sync] Too many pages, stopping");
-        break;
+  console.log("[smithery-sync] Starting full sync...");
+
+  // Smithery API caps non-search results at 100. Use search queries to get all servers.
+  // Single-char queries a-z, 0-9, plus common prefixes to maximize coverage.
+  const queries = "abcdefghijklmnopqrstuvwxyz0123456789".split("");
+
+  for (const q of queries) {
+    let page = 1;
+    let hasMorePages = true;
+
+    while (hasMorePages) {
+      try {
+        const data = await fetchSmitheryPage(q, page, pageSize);
+        const { servers, pagination } = data;
+
+        if (!servers || servers.length === 0) break;
+
+        for (const entry of servers) {
+          const wasNew = await upsertSmitheryServer(entry, seen);
+          if (wasNew) totalUpserted++;
+        }
+
+        hasMorePages = page < pagination.totalPages;
+        page++;
+
+      } catch (error) {
+        console.error(`[smithery-sync] Error on q=${q} page ${page}:`, error);
+        page++;
+        if (page > 200) break;
       }
     }
+
+    console.log(`[smithery-sync] q=${q} done — seen ${seen.size} unique servers so far`);
   }
 
-  console.log(`[smithery-sync] Complete — ${totalUpserted} servers synced from Smithery.ai`);
+  console.log(`[smithery-sync] Complete — ${totalUpserted} servers upserted, ${seen.size} unique from Smithery.ai`);
   return totalUpserted;
 }
