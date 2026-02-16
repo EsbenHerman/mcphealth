@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, usePathname } from "next/navigation";
 
 export function Pagination({ total, limit, offset }: { total: number; limit: number; offset: number }) {
   const searchParams = useSearchParams();
+  const pathname = usePathname();
   if (total <= limit) return null;
 
   const pages = Math.ceil(total / limit);
@@ -13,7 +14,7 @@ export function Pagination({ total, limit, offset }: { total: number; limit: num
   function href(page: number) {
     const params = new URLSearchParams(searchParams.toString());
     params.set("offset", String(page * limit));
-    return `/?${params.toString()}#servers`;
+    return `${pathname}?${params.toString()}`;
   }
 
   return (

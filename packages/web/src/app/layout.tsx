@@ -53,7 +53,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <span className="text-lg font-bold tracking-tight group-hover:text-green-400 transition-colors">MCPHealth</span>
             </Link>
             <nav className="flex items-center gap-6 text-sm text-gray-400">
-              <Link href="/" className="hover:text-gray-100 transition-colors">Dashboard</Link>
+              <Link href="/servers" className="hover:text-gray-100 transition-colors">Servers</Link>
               <Link href="/docs" className="hover:text-gray-100 transition-colors">Docs</Link>
             </nav>
           </div>

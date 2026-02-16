@@ -22,8 +22,8 @@ function Hero() {
           Real-time health monitoring, uptime tracking, and trust scores for thousands of MCP servers from the official registry and Smithery.ai.
         </p>
         <div className="flex items-center justify-center gap-4 pt-2">
-          <a href="#dashboard" className="rounded-lg bg-green-500 px-6 py-2.5 text-sm font-semibold text-gray-950 hover:bg-green-400 transition-colors">
-            Browse servers ↓
+          <a href="/servers" className="rounded-lg bg-green-500 px-6 py-2.5 text-sm font-semibold text-gray-950 hover:bg-green-400 transition-colors">
+            Browse servers →
           </a>
           <a href="#badge" className="rounded-lg border border-gray-700 px-6 py-2.5 text-sm font-semibold text-gray-300 hover:border-gray-500 hover:text-white transition-colors">
             Get a trust badge
@@ -186,7 +186,7 @@ function FAQ() {
 /* ── Composed Landing ─────────────────────────────────────────────── */
 export function Landing({ totalServers, avgScore }: { totalServers: number; avgScore: number | null }) {
   return (
-    <div className="space-y-16 pb-16 border-b border-gray-800/50 mb-12">
+    <div className="space-y-16 pb-8">
       <Hero />
       <StatsStrip totalServers={totalServers} avgScore={avgScore} />
       <HowItWorks />

@@ -1,11 +1,12 @@
 "use client";
 
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { useCallback, useTransition } from "react";
 
 export function ServerFilters() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const pathname = usePathname();
   const [isPending, startTransition] = useTransition();
 
   const update = useCallback(
@@ -14,9 +15,9 @@ export function ServerFilters() {
       if (value) params.set(key, value);
       else params.delete(key);
       params.delete("offset");
-      startTransition(() => router.push(`/?${params.toString()}`));
+      startTransition(() => router.push(`${pathname}?${params.toString()}`));
     },
-    [router, searchParams]
+    [router, searchParams, pathname]
   );
 
   const inputCls = "rounded-lg border border-gray-700 bg-gray-850 px-3 py-2 text-sm text-gray-100 placeholder-gray-500 focus:border-green-500/50 focus:outline-none focus:ring-1 focus:ring-green-500/30 transition-colors";
