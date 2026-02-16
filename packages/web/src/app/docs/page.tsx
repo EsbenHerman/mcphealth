@@ -72,6 +72,7 @@ const endpoints: Endpoint[] = [
       { name: "search", type: "string", description: "Search by name, title, or description" },
       { name: "status", type: "string", description: 'Filter by status: up, down, degraded, unknown, remote' },
       { name: "transport_type", type: "string", description: "Filter by transport type (e.g. sse, stdio)" },
+      { name: "registry_source", type: "string", description: "Filter by source: official, smithery" },
       { name: "score_min", type: "number", description: "Minimum trust score" },
       { name: "score_max", type: "number", description: "Maximum trust score" },
       { name: "sort", type: "string", default: "trust_score", description: "Sort field: trust_score, name, uptime, latency, status" },
@@ -91,6 +92,7 @@ const endpoints: Endpoint[] = [
           description: "Official Anthropic MCP server implementation",
           transportType: "sse",
           currentStatus: "up",
+          registry_source: "official",
           trustScore: 94.7,
           latencyP50: 120,
           latencyP95: 280,
@@ -105,6 +107,7 @@ const endpoints: Endpoint[] = [
           description: "MCP server for filesystem operations",
           transportType: "stdio",
           currentStatus: "local",
+          registry_source: "smithery",
           trustScore: 88.2,
           latencyP50: null,
           latencyP95: null,
@@ -131,6 +134,8 @@ const endpoints: Endpoint[] = [
         transportType: "sse",
         remoteUrl: "https://mcp.anthropic.com/sse",
         currentStatus: "up",
+        registry_source: "official",
+        external_use_count: 15234,
         trustScore: 94.7,
         latencyP50: 120,
         latencyP95: 280,
@@ -158,6 +163,7 @@ const endpoints: Endpoint[] = [
         stability: { score: 95, weight: 0.2, detail: "No status flaps in 7d" },
         compliance: { score: 90, weight: 0.15, detail: "Valid MCP handshake" },
         metadata: { score: 100, weight: 0.1, detail: "All fields present" },
+        popularity: { score: 95, weight: 0.1, detail: "15k+ external uses" },
         freshness: { score: 88, weight: 0.1, detail: "Checked 15m ago" },
       },
     }, null, 2),
@@ -218,6 +224,7 @@ const endpoints: Endpoint[] = [
           stabilityScore: 90,
           complianceScore: 90,
           metadataScore: 100,
+          popularityScore: 92,
           freshnessScore: 85,
         },
         {
@@ -228,6 +235,7 @@ const endpoints: Endpoint[] = [
           stabilityScore: 92,
           complianceScore: 90,
           metadataScore: 100,
+          popularityScore: 95,
           freshnessScore: 88,
         },
       ],
@@ -323,7 +331,7 @@ export default function DocsPage() {
       <div className="mb-12">
         <h1 className="text-3xl font-bold tracking-tight mb-3">API Documentation</h1>
         <p className="text-gray-400 text-lg">
-          The MCPHealth API provides programmatic access to server health data, trust scores, and status information.
+          The MCPHealth API provides programmatic access to server health data, trust scores, and status information. MCPHealth aggregates data from multiple registries including the official MCP registry and Smithery.ai.
         </p>
         <div className="mt-4 rounded-lg bg-gray-900 border border-gray-800 p-4 text-sm">
           <span className="text-gray-400">Base URL:</span>{" "}
