@@ -52,6 +52,15 @@ export function ServerFilters() {
         <option value="sse">SSE</option>
         <option value="stdio">Stdio</option>
       </select>
+      <select
+        defaultValue={searchParams.get("registry_source") ?? ""}
+        onChange={(e) => update("registry_source", e.target.value)}
+        className={inputCls}
+      >
+        <option value="">All sources</option>
+        <option value="official">Official Registry</option>
+        <option value="smithery">Smithery.ai</option>
+      </select>
       <input
         type="search"
         placeholder="Filter by capability…"

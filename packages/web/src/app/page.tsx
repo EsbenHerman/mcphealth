@@ -23,6 +23,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
   if (params.status) apiParams.status = params.status;
   if (params.transport_type) apiParams.transport_type = params.transport_type;
   if (params.capability) apiParams.capability = params.capability;
+  if (params.registry_source) apiParams.registry_source = params.registry_source;
   if (params.sort) { apiParams.sort = params.sort; apiParams.order = "desc"; }
   apiParams.limit = "20";
   if (params.offset) apiParams.offset = params.offset;
@@ -87,6 +88,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
                   <th className="px-4 py-3">Status</th>
                   <th className="px-4 py-3">Server</th>
                   <th className="px-4 py-3 hidden md:table-cell">Transport</th>
+                  <th className="px-4 py-3 hidden lg:table-cell">Source</th>
                   <th className="px-4 py-3">Score</th>
                   <th className="px-4 py-3 hidden sm:table-cell">Latency</th>
                   <th className="px-4 py-3 hidden sm:table-cell">Uptime 24h</th>
@@ -108,6 +110,15 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
                     </td>
                     <td className="px-4 py-3 hidden md:table-cell">
                       <span className="rounded-md bg-gray-800 px-2 py-0.5 text-xs text-gray-400">{s.transportType}</span>
+                    </td>
+                    <td className="px-4 py-3 hidden lg:table-cell">
+                      <span className={`rounded-md px-2 py-0.5 text-xs font-medium ${
+                        s.registrySource === 'official' 
+                          ? 'bg-green-500/10 text-green-400 border border-green-500/20' 
+                          : 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
+                      }`}>
+                        {s.registrySource === 'official' ? 'Official' : 'Smithery'}
+                      </span>
                     </td>
                     <td className="px-4 py-3">
                       <ScoreBadge score={s.trustScore} />

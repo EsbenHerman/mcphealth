@@ -19,7 +19,7 @@ function Hero() {
           <span className="text-green-400">you can trust</span>
         </h1>
         <p className="text-lg text-gray-400 max-w-xl mx-auto leading-relaxed">
-          Real-time health monitoring, uptime tracking, and trust scores for every MCP server in the official registry.
+          Real-time health monitoring, uptime tracking, and trust scores for thousands of MCP servers from the official registry and Smithery.ai.
         </p>
         <div className="flex items-center justify-center gap-4 pt-2">
           <a href="#dashboard" className="rounded-lg bg-green-500 px-6 py-2.5 text-sm font-semibold text-gray-950 hover:bg-green-400 transition-colors">
@@ -38,13 +38,14 @@ function Hero() {
 function StatsStrip({ totalServers, avgScore }: { totalServers: number; avgScore: number | null }) {
   const items = [
     { value: `${totalServers.toLocaleString()}+`, label: "servers tracked" },
+    { value: "2", label: "registries" },
     { value: "Every 30 min", label: "health checks" },
     { value: "0–100", label: "trust scores" },
     { value: avgScore !== null ? Math.round(avgScore).toString() : "—", label: "avg score" },
   ];
 
   return (
-    <section className="grid grid-cols-2 sm:grid-cols-4 gap-px rounded-xl border border-gray-800 bg-gray-800 overflow-hidden">
+    <section className="grid grid-cols-2 sm:grid-cols-5 gap-px rounded-xl border border-gray-800 bg-gray-800 overflow-hidden">
       {items.map((item) => (
         <div key={item.label} className="bg-gray-900/80 px-6 py-5 text-center">
           <p className="text-2xl font-bold text-gray-100">{item.value}</p>
@@ -58,7 +59,7 @@ function StatsStrip({ totalServers, avgScore }: { totalServers: number; avgScore
 /* ── How It Works ─────────────────────────────────────────────────── */
 function HowItWorks() {
   const steps = [
-    { num: "01", icon: "📡", title: "We sync from the registry", desc: "Every MCP server published to the official registry is automatically discovered and added." },
+    { num: "01", icon: "📡", title: "We sync from multiple registries", desc: "MCP servers from the official registry and Smithery.ai are automatically discovered and added, synced every 6 hours." },
     { num: "02", icon: "🔍", title: "We check health", desc: "Automated checks run every 30 minutes — testing connectivity, latency, and protocol compliance." },
     { num: "03", icon: "🏆", title: "We score trust", desc: "A 0–100 trust score combines availability, latency, stability, compliance, and metadata quality." },
   ];
@@ -149,6 +150,10 @@ function FAQ() {
     {
       q: "What is MCP?",
       a: "The Model Context Protocol (MCP) is an open standard for connecting AI assistants to external tools and data sources. MCP servers provide capabilities like file access, database queries, and API integrations that AI models can use.",
+    },
+    {
+      q: "Where do the MCP servers come from?",
+      a: "We track servers from multiple sources: the official MCP registry maintained by Anthropic and Smithery.ai's community registry. Both registries are automatically synced every 6 hours to ensure comprehensive coverage of available MCP servers.",
     },
     {
       q: "What's a trust score?",
