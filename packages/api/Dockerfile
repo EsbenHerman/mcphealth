@@ -23,9 +23,10 @@ COPY --from=build /app/packages/shared/package.json packages/shared/
 COPY --from=build /app/packages/shared/dist packages/shared/dist
 COPY --from=build /app/packages/api/package.json packages/api/
 COPY --from=build /app/packages/api/dist packages/api/dist
+COPY --from=build /app/packages/api/migrations packages/api/migrations
 
 RUN pnpm install --frozen-lockfile --prod
 
 EXPOSE 3001
 ENV PORT=3001
-CMD ["node", "packages/api/dist/index.js"]
+CMD node packages/api/dist/migrate.js && node packages/api/dist/index.js
