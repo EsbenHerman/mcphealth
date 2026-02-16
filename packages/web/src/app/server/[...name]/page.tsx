@@ -122,12 +122,13 @@ export default async function ServerDetailPage({ params }: { params: Promise<{ n
   }
 
   const factors = [
-    { label: "Availability", key: "availability" as keyof ScoreBreakdown["factors"], weight: "35%" },
-    { label: "Latency", key: "latency" as keyof ScoreBreakdown["factors"], weight: "15%" },
+    { label: "Availability", key: "availability" as keyof ScoreBreakdown["factors"], weight: "30%" },
     { label: "Schema Stability", key: "schemaStability" as keyof ScoreBreakdown["factors"], weight: "20%" },
-    { label: "Protocol Compliance", key: "protocolCompliance" as keyof ScoreBreakdown["factors"], weight: "15%" },
-    { label: "Metadata Quality", key: "metadataQuality" as keyof ScoreBreakdown["factors"], weight: "10%" },
-    { label: "Freshness", key: "freshness" as keyof ScoreBreakdown["factors"], weight: "5%" },
+    { label: "Latency", key: "latency" as keyof ScoreBreakdown["factors"], weight: "12%" },
+    { label: "Protocol Compliance", key: "protocolCompliance" as keyof ScoreBreakdown["factors"], weight: "12%" },
+    { label: "Popularity", key: "popularity" as keyof ScoreBreakdown["factors"], weight: "10%" },
+    { label: "Metadata Quality", key: "metadataQuality" as keyof ScoreBreakdown["factors"], weight: "8%" },
+    { label: "Freshness", key: "freshness" as keyof ScoreBreakdown["factors"], weight: "8%" },
   ];
 
   return (
@@ -169,6 +170,18 @@ export default async function ServerDetailPage({ params }: { params: Promise<{ n
             <a href={server.websiteUrl} target="_blank" rel="noopener" className="rounded-md bg-gray-800 px-2.5 py-1 text-gray-400 hover:text-green-400 transition-colors">
               Website ↗
             </a>
+          )}
+          {server.registry_source && (
+            <span className="rounded-md bg-gray-800 border border-gray-800 px-2.5 py-1 text-gray-400">
+              {server.registry_source === "smithery" ? "Smithery.ai" : "Official Registry"}
+            </span>
+          )}
+          {server.external_use_count && (
+            <span className="rounded-md bg-green-500/10 border border-green-500/20 px-2.5 py-1 text-green-400">
+              {server.external_use_count >= 1000000 
+                ? `${(server.external_use_count / 1000000).toFixed(1)}M uses on Smithery`
+                : `${server.external_use_count.toLocaleString()} uses`}
+            </span>
           )}
         </div>
       </section>

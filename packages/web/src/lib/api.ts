@@ -57,6 +57,7 @@ export interface ScoreBreakdown {
     protocolCompliance: ScoreFactor;
     metadataQuality: ScoreFactor;
     freshness: ScoreFactor;
+    popularity: ScoreFactor;
   };
 }
 
@@ -88,6 +89,7 @@ export interface ScoreHistoryPoint {
   complianceScore: number | null;
   metadataScore: number | null;
   freshnessScore: number | null;
+  popularityScore: number | null;
 }
 
 export function getScoreHistory(name: string, days = 30) {
